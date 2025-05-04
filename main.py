@@ -75,7 +75,7 @@ def get_args_parser():
     parser.add_argument('--feature_map_path',
                         default='/home/jiqqi/data/new-new-collective/img_for_fm_fm', type=str)
     parser.add_argument('--ann_path',
-                        default='/home/jiqqi/data/social_CAD/anns_test', type=str)
+                        default='/home/jiqqi/data/social_CAD/anns', type=str)
     parser.add_argument('--is_training', default=True, type=bool)
     parser.add_argument('--num_frames', default=10, type=int,
                         help='number of stacked frame features')
