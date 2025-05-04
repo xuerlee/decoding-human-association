@@ -1,0 +1,368 @@
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import numpy as np
+import torch
+import torch.nn.functional as F
+from torch import nn
+
+from util.misc import (NestedTensor, nested_tensor_from_tensor_list, nested_tensor_from_fm_list,
+                       crop_to_original, accuracy, get_world_size, interpolate,
+                       is_dist_avail_and_initialized)
+
+from .backbone import build_backbone
+from .matcher import build_matcher
+from .transformer import build_transformer
+
+
+class DETR(nn.Module):
+    """ This is the DETR module that performs group recognition and actions classification"""
+    def __init__(self, backbone, transformer, feature_channels, num_action_classes, num_activity_classes, num_queries, aux_loss=False):
+        """ Initializes the model.
+        Parameters:
+            backbone: RoI Align features for individuals for each frame in one batch. See backbone.py
+            transformer: torch module of the transformer architecture. See transformer.py
+            feature_channels: number of feature channels output by the feature extraction part
+            num_aciton_classes: number of individual action categories
+            num_activity_classes: number of group activity categories
+            num_queries: number of queries for decoder, ie group detection slot. This is the maximal number of groups
+                         DETR can detect in a single image.
+            aux_loss: True if auxiliary decoding losses (loss at each decoder layer) are to be used.
+        """
+        super().__init__()
+        self.num_queries = num_queries
+        self.transformer = transformer
+        self.hidden_dim = transformer.d_model
+        self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
+        self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
+        self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
+
+        self.backbone = backbone
+        self.aux_loss = aux_loss
+
+
+    def forward(self, features: NestedTensor, bboxes: NestedTensor, meta):
+        """samples are NestedTensor of the stacked feature maps before roi align, including feature maps and masks
+
+            It returns a dict with the following elements:
+               - "pred_activity_logits (decoder)": the classification logits for activities including no groups for all queries.
+                                Shape= [batch_size x num_queries x (num_classes + 1)]
+               - "pred_action_logits (encoder)": the classification logits for actions for all input roi aligned persons.
+                                Shape= [batch_size x num_persons x (num_classes + 1)]
+               - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
+                                dictionnaries containing the two above keys for each decoder layer.
+        """
+        if isinstance(features, (list, torch.Tensor)):
+            features = nested_tensor_from_fm_list(features)
+
+        src_f, mask_f = features.decompose()  # NestedTensor features  B, T, C, H, W
+        # valid_areas_f = crop_to_original(mask_f)  # batch size, 4 (ymin ymax xmin xmax)
+
+        src_b, mask_b = bboxes.decompose()  # B, n_max, 4
+        valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
+
+        boxes_features, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B*T, n_max
+
+        hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
+
+        # individual action classfication
+        B = src_f.shape[0]
+        T = src_f.shape[1]
+        n_max = src_b.shape[1]
+        memory = memory.view(B, T, n_max, self.hidden_dim).permute(0, 2, 1, 3)  # B, n_max, T, hidden_dim
+        mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
+        outputs_action_class = self.action_class_embed(memory)  # B, n_max, T, num_action_classes
+        outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max
+        action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
+
+        # group activity classification
+        hs = hs.view(-1, B, T, self.num_queries, self.hidden_dim).permute(0, 1, 3, 2, 4)
+        outputs_activity_class = self.activity_class_embed(hs)  # num_dec_layers, B, num_queries, T, num_activity_classes
+        activity_scores = outputs_activity_class.mean(dim=3)  # num_dec_layers, B, num_queries, num_activity_classes
+
+        # for grouping based on attention weights
+        attention_weights = attention_weights.view(B, T, self.num_queries, n_max).permute(0, 3, 1, 2)  # B, n_max, T, num_queries
+        attention_weights = attention_weights * mask.unsqueeze(-1)
+        attention_weights = attention_weights.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_queries
+        attention_weights = F.softmax(attention_weights, dim=1)  # make the sum of logits as 1
+
+        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
+        if self.aux_loss:
+            out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
+        return out
+
+    @torch.jit.unused
+    def _set_aux_loss(self, action_scores, activity_scores, attention_weights):
+        # this is a workaround to make torchscript happy, as torchscript
+        # doesn't support dictionary with non-homogeneous values, such
+        # as a dict having both a Tensor and a list.
+        return [{'pred_action_logits': action_scores, 'pred_activity_logits': a, 'attention_weights': attention_weights} for a in activity_scores[:-1]]
+
+
+class SetCriterion(nn.Module):
+    """ This class computes the loss for DETR.
+    The process happens in two steps:
+        1) we compute hungarian assignment between ground truth groups and the outputs of the model
+        2) we supervise each pair of matched ground-truth / prediction (supervise class and grouping)
+    """
+    # TODO: add action class consistency: the relations between individual actions and group activities
+    def __init__(self, num_action_classes, num_activity_classes, matcher, weight_dict, eos_coef, losses):
+        """ Create the criterion.
+        Parameters:
+            num_action_classes: number of individual actions categories
+            num_activity_classes: number of group activities categories
+            matcher: module able to compute a matching between targets and predictions
+            weight_dict: dict containing as key the names of the losses and as values their relative weight.
+            eos_coef: relative classification weight applied to the empty groups categories
+            losses: list of all the losses to be applied. See get_loss for list of available losses.
+        """
+        super().__init__()
+        self.num_action_classes = num_action_classes
+        self.num_activity_classes = num_activity_classes
+        self.matcher = matcher
+        self.weight_dict = weight_dict
+        self.losses = losses
+        # for empty group prediction
+        self.eos_coef = eos_coef
+        self.empty_weight = torch.ones(self.num_activity_classes + 1)
+        self.empty_weight[-1] = self.eos_coef
+        self.register_buffer('empty_activity_weight', self.empty_weight)
+
+    def loss_activity_labels(self, outputs, targets, indices, num_groups, log=True):
+        """group activity classification loss (NLL)
+        targets dicts must contain the key "pred_activity_logits"
+        """
+        assert 'pred_activity_logits' in outputs
+        out_activity_prob = outputs['pred_activity_logits']  # [B, num_queries, num_activity_classes]
+        tgt_activity_ids, mask_ids = targets[1].decompose()  # B, num_group_max
+
+        '''
+        1 get batch idx and src idx from matcher
+        2 change orders of targets according to tgt inx from matcher to match the prediction orders 
+        3 construct target tensor for loss calculation, with same shape as output logits
+        4 fill the target tensor by targets with the same order as corresponding matched logits
+        '''
+        idx = self._get_src_permutation_idx(indices)  # length: sum of the number of groups in a whole batch
+
+        target_classes_o = torch.cat([t[J] for t, (_, J) in zip(tgt_activity_ids, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
+        target_classes = torch.full(out_activity_prob.shape[:2], self.num_activity_classes,
+                                    dtype=torch.int64, device=out_activity_prob.device)  # the id of the empty group is num_activity_class
+        target_classes[idx] = target_classes_o  # target_classes[idx]: set other output matched group idxes except for empty groups  # bs, num_queries
+
+
+        self.empty_weight = self.empty_weight.to(out_activity_prob.device)
+        loss_ce = F.cross_entropy(out_activity_prob.transpose(1, 2), target_classes, weight=self.empty_weight)
+        losses = {'loss_activity': loss_ce}
+
+        if log:
+            losses['activity_class_error'] = 100 - accuracy(out_activity_prob[idx], target_classes_o)[0]  # 100 - accuracy
+        return losses
+
+    def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
+        """individual action lassification loss (NLL)
+        targets dicts must contain the key "pred_action_logits" containing a tensor of dim [nb_target_boxes]
+        """
+        assert 'pred_action_logits' in outputs
+        src_logits = outputs['pred_action_logits']  # [B, n_max, num_action_classes]
+        tgt_action_ids, mask_ids = targets[0].decompose()  # B, n_max
+
+        idx = torch.where(tgt_action_ids != -1)
+        tgt_action_ids = tgt_action_ids[idx]  # n_persons in B
+        src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
+
+        loss_ce = F.cross_entropy(src_logits, tgt_action_ids)
+        losses = {'loss_action': loss_ce}
+
+        if log:
+            losses['action_class_error'] = 100 - accuracy(src_logits, tgt_action_ids)[0]
+        return losses
+
+    @torch.no_grad()
+    def loss_cardinality(self, outputs, targets, indices, num_groups):
+        """ Compute the cardinality error, ie the absolute error in the number of predicted non-empty groups
+        This is not really a loss, it is intended for logging purposes only. It doesn't propagate gradients
+        """
+        pred_logits = outputs['pred_activity_logits']
+        device = pred_logits.device
+        tgt_activity_ids, mask_ids = targets[1].decompose()  # B, num_group_max
+        tgt_lengths = torch.tensor([(v != -1).sum() for v in tgt_activity_ids],device=device)
+
+        # Count the number of predictions that are NOT "no-group" (which is the last class)
+        card_pred = (pred_logits.argmax(-1) != pred_logits.shape[-1] - 1).sum(1)  # judge if the predicted class is the empty group class
+        card_err = F.l1_loss(card_pred.float(), tgt_lengths)
+        losses = {'cardinality_error': card_err}
+        return losses
+
+    def loss_grouping(self, outputs, targets, indices, num_groups):
+        """Compute the losses related to the grouping results, using the binary cross entropy loss
+        """
+        assert 'attention_weights' in outputs
+        src_aw = outputs['attention_weights']  # B, n_max, num_queries
+        tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
+        tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max
+
+        idx = self._get_src_permutation_idx(indices)
+        target_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(tgt_one_hot_ini, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
+        target_one_hot = torch.full(src_aw.shape, 0,
+                                    dtype=torch.int64, device=src_aw.device)
+        target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
+        target_one_hot[idx] = target_one_hot_o.long()  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
+
+        loss_grouping = F.binary_cross_entropy(src_aw.transpose(1, 2), target_one_hot.float(), reduction='none')
+
+        losses = {}
+        losses['loss_grouping'] = loss_grouping.sum() / num_groups
+
+        return losses
+
+    def _get_src_permutation_idx(self, indices):
+        # permute predictions following indices
+        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])  # tensor with length of sum of num of groups in one batch, indicating batch id: e.g.: tensor([0, 0, 1, 1, 1, 1, 1, 1, 1])
+        src_idx = torch.cat([src for (src, _) in indices])  # tensor of src id, e.g.: tensor([4, 8, 1, 2, 3, 4, 5, 6, 7])
+        return batch_idx, src_idx
+
+    def _get_tgt_permutation_idx(self, indices):
+        # permute targets following indices
+        batch_idx = torch.cat([torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)])
+        tgt_idx = torch.cat([tgt for (_, tgt) in indices])
+        return batch_idx, tgt_idx
+
+    def get_loss(self, loss, outputs, targets, indices, num_boxes, **kwargs):
+        loss_map = {
+            'activity': self.loss_activity_labels,
+            'action': self.loss_action_labels,
+            'cardinality': self.loss_cardinality,
+            'grouping': self.loss_grouping,
+        }
+        assert loss in loss_map, f'do you really want to compute {loss} loss?'
+        return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
+
+    def forward(self, outputs, targets):
+        """ This performs the loss computation.
+        Parameters:
+             outputs: dict of tensors, see the output specification of the model for the format
+             targets: list of tensors
+                      action classes: Tensor of dim [num_individuals] (where num_individuals is the number of ground-truth
+                      individuals in the target) containing the individual action class labels
+                      activity classes: Tensor of dim [num_target_groups] (where num_target_groups is the number of ground-truth
+                      groups in the target) containing the group activity class labels
+                      one-hot matrices: Tensor of dim [num_persons, num_target_groups] indicating the target grouping arrangement
+        """
+        outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs' and k != 'pred_action_logits'}
+        # Retrieve the matching between the outputs of the last layer and the targets
+        indices = self.matcher(outputs_without_aux, targets[1:])
+        # Compute the average number of target groups accross all nodes, for normalization purposes
+        num_groups = (targets[1].decompose()[0] != -1).sum()
+        num_groups = torch.as_tensor([num_groups], dtype=torch.float, device=next(iter(outputs.values())).device)
+        if is_dist_avail_and_initialized():
+            torch.distributed.all_reduce(num_groups)
+        num_groups = torch.clamp(num_groups / get_world_size(), min=1).item()  # every gpu has at least on positive sample
+
+        # Compute all the requested losses
+        losses = {}
+        for loss in self.losses:
+            losses.update(self.get_loss(loss, outputs, targets, indices, num_groups))
+
+        # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
+        if 'aux_outputs' in outputs:
+            for i, aux_outputs in enumerate(outputs['aux_outputs']):
+                indices = self.matcher(aux_outputs, targets[1:])
+                for loss in self.losses:
+                    kwargs = {}
+                    if loss == 'avtivity':
+                        # Logging is enabled only for the last layer
+                        kwargs = {'log': False}
+                    l_dict = self.get_loss(loss, aux_outputs, targets, indices, num_groups, **kwargs)
+                    l_dict = {k + f'_{i}': v for k, v in l_dict.items()}
+                    losses.update(l_dict)
+
+        return losses
+
+
+class PostProcess(nn.Module):
+    """ This module converts the model's output into the format expected by the coco api"""
+    @torch.no_grad()
+    def forward(self, outputs, target_sizes):
+        """ Perform the computation
+        Parameters:
+            outputs: raw outputs of the model
+            target_sizes: tensor of dimension [batch_size x 2] containing the size of each images of the batch
+                          For evaluation, this must be the original image size (before any data augmentation)
+                          For visualization, this should be the image size after data augment, but before padding
+        """
+        out_logits, out_bbox = outputs['pred_logits'], outputs['pred_boxes']
+
+        assert len(out_logits) == len(target_sizes)
+        assert target_sizes.shape[1] == 2
+
+        prob = F.softmax(out_logits, -1)
+        scores, labels = prob[..., :-1].max(-1)
+
+        # convert to [x0, y0, x1, y1] format
+        boxes = box_ops.box_cxcywh_to_xyxy(out_bbox)
+        # and from relative [0, 1] to absolute [0, height] coordinates
+        img_h, img_w = target_sizes.unbind(1)
+        scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
+        boxes = boxes * scale_fct[:, None, :]
+
+        results = [{'scores': s, 'labels': l, 'boxes': b} for s, l, b in zip(scores, labels, boxes)]
+
+        return results
+
+
+class MLP(nn.Module):
+    """ Very simple multi-layer perceptron (also called FFN)"""
+
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+        super().__init__()
+        self.num_layers = num_layers
+        h = [hidden_dim] * (num_layers - 1)
+        self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
+
+    def forward(self, x):
+        for i, layer in enumerate(self.layers):
+            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        return x
+
+
+def build(args):
+    # the `num_classes` naming here is somewhat misleading.
+    # it indeed corresponds to `max_obj_id + 1`, where max_obj_id
+    # is the maximum id for a class in your dataset. For example,
+    # COCO has a max_obj_id of 90, so we pass `num_classes` to be 91.
+    # As another example, for a dataset that has a single class with id 1,
+    # you should pass `num_classes` to be 2 (max_obj_id + 1).
+    # FIXME: num class of volleyball
+    num_action_classes = 6 if args.feature_file != 'volleyball' else 9  # not sure
+    num_activity_classes = 6 if args.feature_file != 'volleyball' else 4  # not sure
+
+    device = torch.device(args.device)
+
+    backbone = build_backbone(args)
+
+    transformer = build_transformer(args)
+
+    model = DETR(
+        backbone,
+        transformer,
+        feature_channels=args.feature_channels,
+        num_action_classes=num_action_classes,
+        num_activity_classes=num_activity_classes,
+        num_queries=args.num_queries,
+        aux_loss=args.aux_loss,
+    )
+    matcher = build_matcher(args)
+    weight_dict = {'loss_action': args.action_loss_coef, 'loss_activity': args.activity_loss_coef, 'loss_grouping': args.grouping_loss_coef}
+    if args.aux_loss:
+        aux_weight_dict = {}
+        for i in range(args.dec_layers - 1):
+            aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
+        weight_dict.update(aux_weight_dict)
+
+    losses = ['activity', 'grouping', 'action', 'cardinality']
+    # losses = ['activity', 'grouping', 'action']
+    criterion = SetCriterion(num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
+                             eos_coef=args.eos_coef, losses=losses)
+    criterion.to(device)
+    # postprocessors = {'bbox': PostProcess()}
+
+    return model, criterion
