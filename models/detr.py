@@ -105,7 +105,7 @@ class SetCriterion(nn.Module):
         2) we supervise each pair of matched ground-truth / prediction (supervise class and grouping)
     """
     # TODO: add action class consistency: the relations between individual actions and group activities
-    def __init__(self, num_action_classes, num_activity_classes, matcher, weight_dict, eos_coef, losses):
+    def __init__(self, dataset, num_action_classes, num_activity_classes, matcher, weight_dict, eos_coef, losses):
         """ Create the criterion.
         Parameters:
             num_action_classes: number of individual actions categories
@@ -116,6 +116,7 @@ class SetCriterion(nn.Module):
             losses: list of all the losses to be applied. See get_loss for list of available losses.
         """
         super().__init__()
+        self.dataset = dataset
         self.num_action_classes = num_action_classes
         self.num_activity_classes = num_activity_classes
         self.matcher = matcher
@@ -126,13 +127,14 @@ class SetCriterion(nn.Module):
         self.empty_weight = torch.ones(self.num_activity_classes + 1)
         self.empty_weight[-1] = self.eos_coef
         self.register_buffer('empty_activity_weight', self.empty_weight)
+        self.register_buffer("G2I_mask", self._build_G2I_mask(self.num_activity_classes, self.num_action_classes))
 
     def loss_activity_labels(self, outputs, targets, indices, num_groups, log=True):
         """group activity classification loss (NLL)
         targets dicts must contain the key "pred_activity_logits"
         """
         assert 'pred_activity_logits' in outputs
-        out_activity_prob = outputs['pred_activity_logits']  # [B, num_queries, num_activity_classes]
+        out_activity_logits = outputs['pred_activity_logits']  # [B, num_queries, num_activity_classes]
         tgt_activity_ids, mask_ids = targets[1].decompose()  # B, num_group_max
 
         '''
@@ -144,17 +146,17 @@ class SetCriterion(nn.Module):
         idx = self._get_src_permutation_idx(indices)  # length: sum of the number of groups in a whole batch
 
         target_classes_o = torch.cat([t[J] for t, (_, J) in zip(tgt_activity_ids, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
-        target_classes = torch.full(out_activity_prob.shape[:2], self.num_activity_classes,
-                                    dtype=torch.int64, device=out_activity_prob.device)  # the id of the empty group is num_activity_class
+        target_classes = torch.full(out_activity_logits.shape[:2], self.num_activity_classes,
+                                    dtype=torch.int64, device=out_activity_logits.device)  # the id of the empty group is num_activity_class
         target_classes[idx] = target_classes_o  # target_classes[idx]: set other output matched group idxes except for empty groups  # bs, num_queries
 
 
-        self.empty_weight = self.empty_weight.to(out_activity_prob.device)
-        loss_ce = F.cross_entropy(out_activity_prob.transpose(1, 2), target_classes, weight=self.empty_weight)
+        self.empty_weight = self.empty_weight.to(out_activity_logits.device)
+        loss_ce = F.cross_entropy(out_activity_logits.transpose(1, 2), target_classes, weight=self.empty_weight)
         losses = {'loss_activity': loss_ce}
 
         if log:
-            losses['activity_class_error'] = 100 - accuracy(out_activity_prob[idx], target_classes_o)[0]  # 100 - accuracy
+            losses['activity_class_error'] = 100 - accuracy(out_activity_logits[idx], target_classes_o)[0]  # 100 - accuracy
         return losses
 
     def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
@@ -214,6 +216,42 @@ class SetCriterion(nn.Module):
 
         return losses
 
+    def loss_action_group_consistency(self, outputs, targets, indices, num_groups):
+        out_activity_logits = outputs['pred_activity_logits']  # [B, num_queries, num_activity_classes]
+        out_action_logits = outputs['pred_action_logits']  # [B, n_max, num_action_classes]
+        src_aw = outputs['attention_weights']  # B, n_max, num_queries
+        G2I_mask = self._build_G2I_mask(self.num_activity_classes, self.num_action_classes).to(src_aw.device)  # num_group_classes, num_action_classes
+        G2I_mask = F.softmax(G2I_mask.float(), dim=1)  # one-hot matrix, transfer group labels to related action labels
+
+        out_action_probs = F.softmax(out_action_logits, dim=-1)  # B, n_max, num_action_classes
+        out_group_labels = out_activity_logits.argmax(dim=-1)  # B, num_queries
+        group_expected_actions = G2I_mask[out_group_labels]  # B, num_queries, num_action_classes (one-hot)  select the correspoding rows in g2i mask to get the corresponding expected action distribution
+
+        _, valid_mask = targets[0].decompose()
+        valid_person_mask = ~valid_mask  # B, n_max
+        valid_group_mask = (out_group_labels != self.num_activity_classes)  # B, num_queries  mask empty groups
+
+        loss = 0
+        B = valid_mask.shape[0]
+        for b in range(B):
+            src_aw_b = src_aw[b][valid_person_mask[b]]  # n_b, num_queries
+            out_action_probs_b = out_action_probs[b][valid_person_mask[b]]  # n_b, num_action_classes
+            actions_in_group_dist_b = torch.matmul(src_aw_b.T, out_action_probs_b)  # [n_queries, num_action_classes]  distribution of actions in group
+            group_expected_actions_b = group_expected_actions[b]  # n_queries, num_action_classes
+
+            num_valid = (valid_group_mask[b] != False).sum()
+            if num_valid == 0:
+                loss_b = torch.tensor(0., device=src_aw.device, requires_grad=True)
+            else:
+                loss_b = F.binary_cross_entropy(
+                    actions_in_group_dist_b[valid_group_mask[b]],
+                    group_expected_actions_b[valid_group_mask[b]].float())
+            loss += loss_b
+
+        losses = {}
+        losses['consistency'] = loss
+        return losses
+
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
         batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])  # tensor with length of sum of num of groups in one batch, indicating batch id: e.g.: tensor([0, 0, 1, 1, 1, 1, 1, 1, 1])
@@ -226,15 +264,22 @@ class SetCriterion(nn.Module):
         tgt_idx = torch.cat([tgt for (_, tgt) in indices])
         return batch_idx, tgt_idx
 
-    def get_loss(self, loss, outputs, targets, indices, num_boxes, **kwargs):
+    def _build_G2I_mask(self, G, A):
+        mask = torch.zeros(G+1, A)
+        if self.dataset == 'collective':
+            mask = torch.eye(G+1, A)
+        return mask
+
+    def get_loss(self, loss, outputs, targets, indices, num_groups, **kwargs):
         loss_map = {
             'activity': self.loss_activity_labels,
             'action': self.loss_action_labels,
             'cardinality': self.loss_cardinality,
             'grouping': self.loss_grouping,
+            'consistency': self.loss_action_group_consistency,
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
-        return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
+        return loss_map[loss](outputs, targets, indices, num_groups, **kwargs)
 
     def forward(self, outputs, targets):
         """ This performs the loss computation.
@@ -351,16 +396,16 @@ def build(args):
         aux_loss=args.aux_loss,
     )
     matcher = build_matcher(args)
-    weight_dict = {'loss_action': args.action_loss_coef, 'loss_activity': args.activity_loss_coef, 'loss_grouping': args.grouping_loss_coef}
+    weight_dict = {'loss_action': args.action_loss_coef, 'loss_activity': args.activity_loss_coef, 'loss_grouping': args.grouping_loss_coef, 'loss_consistency': args.consistency_loss_coef}
     if args.aux_loss:
         aux_weight_dict = {}
         for i in range(args.dec_layers - 1):
             aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
         weight_dict.update(aux_weight_dict)
 
-    losses = ['activity', 'grouping', 'action', 'cardinality']
+    losses = ['activity', 'grouping', 'action', 'cardinality', 'consistency']
     # losses = ['activity', 'grouping', 'action']
-    criterion = SetCriterion(num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
+    criterion = SetCriterion(args.feature_file, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
                              eos_coef=args.eos_coef, losses=losses)
     criterion.to(device)
     # postprocessors = {'bbox': PostProcess()}

@@ -266,15 +266,6 @@ def get_sha():
     message = f"sha: {sha}, status: {diff}, branch: {branch}"
     return message
 
-# FIXME delete
-# TODO: roi align, padding_mask or resize, concatenate, CUDA before input of transformer
-#  or do it after collate_fn and before input
-# def collate_fn(batch):
-#     batch = list(zip(*batch))  # batch[0]: tuple input nested_tensor_from_tensor_list
-#     print('batch', type(batch[0]))
-#     batch[0] = nested_tensor_from_tensor_list(batch[0])
-#     return tuple(batch)
-
 def collate_fn(batch):
     featuremaps, bboxes, actions, activities, one_hot_matrix, meta = list(zip(*batch))  # featuremap: tuple?
     featuremaps = nested_tensor_from_fm_list(featuremaps)
@@ -294,7 +285,6 @@ def collate_fn(batch):
     targets = [bboxes, actions, activities, one_hot_matrix]
 
     return featuremaps, targets, meta
-# TODO: how to predict the activities and assign the activity label for each group rather than person
 
 
 def _max_by_axis(the_list):  # list of tensor shape list (3 or 4 dimensions)
@@ -407,7 +397,6 @@ def setup_for_distributed(is_master):
             builtin_print(*args, **kwargs)
 
     __builtin__.print = print
-
 
 def is_dist_avail_and_initialized():
     if not dist.is_available():

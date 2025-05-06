@@ -67,6 +67,7 @@ def get_args_parser():
     parser.add_argument('--action_loss_coef', default=2, type=float)
     parser.add_argument('--activity_loss_coef', default=2, type=float)
     parser.add_argument('--grouping_loss_coef', default=5, type=float)
+    parser.add_argument('--consistency_loss_coef', default=2, type=float)
     parser.add_argument('--eos_coef', default=0.1, type=float,
                         help="Relative classification weight of the no-object classes (empty groups)")
 
