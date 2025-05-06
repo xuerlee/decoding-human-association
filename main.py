@@ -105,7 +105,8 @@ def get_args_parser():
 
 
 def main(args):
-    writer = SummaryWriter(log_dir='runs/experiment1')
+    writer_dir = args.output_dir.split('/')[-1]
+    writer = SummaryWriter(log_dir=f'runs/{writer_dir}')
     utils.init_distributed_mode(args)
     print("git:\n  {}\n".format(utils.get_sha()))
 
