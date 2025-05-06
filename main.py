@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.tensorboard import SummaryWriter
 
 import os
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
@@ -85,7 +86,6 @@ def get_args_parser():
     parser.add_argument('--roi_align', default=[7, 7], type=int,  # openpifpaf output
                         help='size of roi_align')
 
-
     parser.add_argument('--output_dir', default='output_dir/test',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
@@ -105,6 +105,7 @@ def get_args_parser():
 
 
 def main(args):
+    writer = SummaryWriter(log_dir='runs/experiment1')
     utils.init_distributed_mode(args)
     print("git:\n  {}\n".format(utils.get_sha()))
 
@@ -184,7 +185,7 @@ def main(args):
         if args.distributed:
             sampler_train.set_epoch(epoch)
         train_stats = train_one_epoch(
-            model, criterion, data_loader_train, optimizer, device, epoch,
+            model, criterion, data_loader_train, optimizer, device, epoch, writer,
             args.clip_max_norm)  # engine.py -- train_one_epoch
         lr_scheduler.step()
         if args.output_dir:
@@ -224,7 +225,7 @@ def main(args):
             #         for name in filenames:
             #             torch.save(coco_evaluator.coco_eval["bbox"].eval,
             #                        output_dir / "eval" / name)
-
+    writer.close()
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))

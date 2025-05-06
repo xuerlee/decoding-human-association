@@ -13,7 +13,7 @@ import util.misc as utils
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 0):
+                    device: torch.device, epoch: int, writer, max_norm: float = 0):
     model.train()
     criterion.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -23,7 +23,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
 
-    for samples, targets, meta in metric_logger.log_every(data_loader, print_freq, header):
+    for iteration, (samples, targets, meta) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         samples = samples.to(device)  # feature maps
 
         # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -33,10 +33,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
 
-        # reduce losses over all GPUs for logging purposes
+        # reduce losses over all GPUs for logging purposes (average loss of all GPUs)
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         loss_dict_reduced_unscaled = {f'{k}_unscaled': v
-                                      for k, v in loss_dict_reduced.items()}
+                                      for k, v in loss_dict_reduced.items()}  # losses without multiplying weights
         loss_dict_reduced_scaled = {k: v * weight_dict[k]
                                     for k, v in loss_dict_reduced.items() if k in weight_dict}
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
@@ -58,6 +58,21 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         metric_logger.update(activity_class_error=loss_dict_reduced['activity_class_error'])
         metric_logger.update(action_class_error=loss_dict_reduced['action_class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+
+        if writer is not None:
+            global_step = epoch * len(data_loader) + iteration
+            writer.add_scalar('Loss/total', loss_value, global_step)
+
+            for k, v in loss_dict_reduced_scaled.items():
+                writer.add_scalar(f'Loss_scaled/{k}', v.item(), global_step)
+
+            for k, v in loss_dict_reduced_unscaled.items():
+                writer.add_scalar(f'Loss_unscaled/{k}', v.item(), global_step)
+
+            writer.add_scalar('Error/activity_class_error', loss_dict_reduced['activity_class_error'], global_step)
+            writer.add_scalar('Error/action_class_error', loss_dict_reduced['action_class_error'], global_step)
+            writer.add_scalar('LR', optimizer.param_groups[0]["lr"], global_step)
+
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
