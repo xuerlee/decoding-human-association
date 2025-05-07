@@ -249,7 +249,7 @@ class SetCriterion(nn.Module):
             loss += loss_b
 
         losses = {}
-        losses['consistency'] = loss
+        losses['loss_consistency'] = loss
         return losses
 
     def _get_src_permutation_idx(self, indices):
