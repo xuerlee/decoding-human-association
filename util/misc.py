@@ -384,6 +384,14 @@ def crop_to_original(mask):
     valid_areas = torch.tensor(valid_areas)
     return valid_areas
 
+def binary_label_smoothing(target, eps):
+    """
+    smoothed labels:
+    0 -> eps/(num_classes - 1)，1 -> 1 - eps
+    """
+    return target * (1 - eps) + 0.5 * eps
+
+
 def setup_for_distributed(is_master):
     """
     This function disables printing when not in master process

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list, nested_tensor_from_fm_list,
-                       crop_to_original, accuracy, get_world_size, interpolate,
+                       crop_to_original, binary_label_smoothing, accuracy, get_world_size, interpolate,
                        is_dist_avail_and_initialized)
 
 from .backbone import build_backbone
@@ -200,6 +200,8 @@ class SetCriterion(nn.Module):
         assert 'attention_weights' in outputs
         src_aw = outputs['attention_weights']  # B, n_max, num_queries
         tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
+        tgt_one_hot_ini = binary_label_smoothing(tgt_one_hot_ini, 0.1)
+
         tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max
 
         idx = self._get_src_permutation_idx(indices)
@@ -221,7 +223,8 @@ class SetCriterion(nn.Module):
         out_action_logits = outputs['pred_action_logits']  # [B, n_max, num_action_classes]
         src_aw = outputs['attention_weights']  # B, n_max, num_queries
         G2I_mask = self._build_G2I_mask(self.num_activity_classes, self.num_action_classes).to(src_aw.device)  # num_group_classes, num_action_classes
-        G2I_mask = F.softmax(G2I_mask.float(), dim=1)  # one-hot matrix, transfer group labels to related action labels
+        # G2I_mask = F.softmax(G2I_mask.float(), dim=1)  # one-hot matrix, transfer group labels to related action labels
+        G2I_mask = binary_label_smoothing(G2I_mask.float(), 0.1)  # one-hot matrix, transfer group labels to related action labels
 
         out_action_probs = F.softmax(out_action_logits, dim=-1)  # B, n_max, num_action_classes
         out_group_labels = out_activity_logits.argmax(dim=-1)  # B, num_queries
