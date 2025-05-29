@@ -211,7 +211,7 @@ class SetCriterion(nn.Module):
         target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
         target_one_hot[idx] = target_one_hot_o.long()  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
 
-        loss_grouping = F.binary_cross_entropy(src_aw.transpose(1, 2), target_one_hot.float(), reduction='none')
+        loss_grouping = F.binary_cross_entropy(src_aw.transpose(1, 2), target_one_hot.float(), reduction='mean')
 
         losses = {}
         losses['loss_grouping'] = loss_grouping.sum() / num_groups
