@@ -407,7 +407,7 @@ def build(args):
         weight_dict.update(aux_weight_dict)
 
     # losses = ['activity', 'grouping', 'action', 'cardinality', 'consistency']
-    losses = ['activity', 'grouping', 'action', 'consistency']
+    losses = ['activity', 'grouping', 'action', 'cardinality']
     # losses = ['activity', 'grouping', 'action']
     criterion = SetCriterion(args.feature_file, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
                              eos_coef=args.eos_coef, losses=losses)
