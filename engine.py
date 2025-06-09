@@ -53,7 +53,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         optimizer.step()
 
         metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
-        metric_logger.update(activity_class_error=loss_dict_reduced['activity_class_error'])
+        # metric_logger.update(activity_class_error=loss_dict_reduced['activity_class_error'])
         metric_logger.update(action_class_error=loss_dict_reduced['action_class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
