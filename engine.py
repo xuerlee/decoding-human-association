@@ -67,7 +67,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             for k, v in loss_dict_reduced_unscaled.items():
                 writer.add_scalar(f'Loss_unscaled/{k}', v.item(), global_step)
 
-            writer.add_scalar('Error/activity_class_error', loss_dict_reduced['activity_class_error'], global_step)
+            # writer.add_scalar('Error/activity_class_error', loss_dict_reduced['activity_class_error'], global_step)
             writer.add_scalar('Error/action_class_error', loss_dict_reduced['action_class_error'], global_step)
             writer.add_scalar('LR', optimizer.param_groups[0]["lr"], global_step)
 
