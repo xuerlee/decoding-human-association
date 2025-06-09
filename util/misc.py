@@ -68,8 +68,6 @@ class SmoothedValue(object):
 
     @property
     def global_avg(self):
-        if self.count == 0:
-            self.count = 1e-6
         return self.total / self.count
 
     @property
