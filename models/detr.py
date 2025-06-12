@@ -11,7 +11,7 @@ from util.misc import (NestedTensor, nested_tensor_from_tensor_list, nested_tens
 from .backbone import build_backbone
 from .matcher import build_matcher
 from .transformer import build_transformer
-
+import time
 
 class DETR(nn.Module):
     """ This is the DETR module that performs group recognition and actions classification"""
@@ -59,9 +59,7 @@ class DETR(nn.Module):
 
         src_b, mask_b = bboxes.decompose()  # B, n_max, 4
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
-
         boxes_features, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B*T, n_max
-
         hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
 
         # individual action classfication
@@ -85,11 +83,12 @@ class DETR(nn.Module):
         attention_weights = self.aw_embed(attention_weights)  # B*T, n_max, num_queries
         attention_weights = attention_weights.transpose(1, 2)  # B*T, num_queries, n_max
         attention_weights = attention_weights.view(B, T, self.num_queries, n_max).permute(0, 3, 1, 2)  # B, n_max, T, num_queries
-        attention_weights = attention_weights * mask.unsqueeze(-1)
         attention_weights = attention_weights.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_queries
-        attention_weights = F.softmax(attention_weights, dim=1)  # make the sum of logits as 1
+        attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
+        attention_weights = attention_weights * mask  # mask: B*T, n_max, num_queries
 
         out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
+
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
         return out
@@ -154,7 +153,6 @@ class SetCriterion(nn.Module):
                                     dtype=torch.int64, device=out_activity_logits.device)  # the id of the empty group is num_activity_class
         target_classes[idx] = target_classes_o  # target_classes[idx]: set other output matched group idxes except for empty groups  # bs, num_queries
 
-
         self.empty_weight = self.empty_weight.to(out_activity_logits.device)
         loss_ce = F.cross_entropy(out_activity_logits.transpose(1, 2), target_classes, weight=self.empty_weight)
         losses = {'loss_activity': loss_ce}
@@ -203,20 +201,17 @@ class SetCriterion(nn.Module):
         """
         assert 'attention_weights' in outputs
         src_aw = outputs['attention_weights']  # B, n_max, num_queries
-        tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
-        tgt_one_hot_ini = binary_label_smoothing(tgt_one_hot_ini, 0.1)
 
+        tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
         tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max
 
         idx = self._get_src_permutation_idx(indices)
         target_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(tgt_one_hot_ini, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
         target_one_hot = torch.full(src_aw.shape, 0,
-                                    dtype=torch.int64, device=src_aw.device)
+                                    dtype=torch.int, device=src_aw.device)
         target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
-        target_one_hot[idx] = target_one_hot_o.long()  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
-
+        target_one_hot[idx] = target_one_hot_o  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
         loss_grouping = F.binary_cross_entropy(src_aw.transpose(1, 2), target_one_hot.float(), reduction='mean')
-
         losses = {}
         losses['loss_grouping'] = loss_grouping.sum() / num_groups
 
@@ -228,7 +223,7 @@ class SetCriterion(nn.Module):
         src_aw = outputs['attention_weights']  # B, n_max, num_queries
         G2I_mask = self._build_G2I_mask(self.num_activity_classes, self.num_action_classes).to(src_aw.device)  # num_group_classes, num_action_classes
         # G2I_mask = F.softmax(G2I_mask.float(), dim=1)  # one-hot matrix, transfer group labels to related action labels
-        G2I_mask = binary_label_smoothing(G2I_mask.float(), 0.1)  # one-hot matrix, transfer group labels to related action labels
+        G2I_mask = binary_label_smoothing(G2I_mask.float(), 0.1, False)  # one-hot matrix, transfer group labels to related action labels
 
         out_action_probs = F.softmax(out_action_logits, dim=-1)  # B, n_max, num_action_classes
         out_group_labels = out_activity_logits.argmax(dim=-1)  # B, num_queries

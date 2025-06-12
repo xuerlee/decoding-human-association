@@ -384,12 +384,16 @@ def crop_to_original(mask):
     valid_areas = torch.tensor(valid_areas)
     return valid_areas
 
-def binary_label_smoothing(target, eps):
+def binary_label_smoothing(target, eps, bicls):
     """
     smoothed labels:
     0 -> eps/(num_classes - 1)，1 -> 1 - eps
     """
-    return target * (1 - eps) + 0.5 * eps
+    if bicls == True:
+        num_classes = target.size(-1)
+        return target * (1 - eps) + eps / num_classes
+    else:
+        return target * (1 - eps) + 0.5 * eps
 
 
 def setup_for_distributed(is_master):
