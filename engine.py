@@ -26,10 +26,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     for iteration, (samples, targets, meta) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         samples = samples.to(device)  # feature maps
 
-        # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         targets = [t.to(device) for t in targets]  # bboxes, actions, activities, one_hot_matrix
         outputs = model(samples, targets[0], meta)
-        loss_dict = criterion(outputs, targets[1: ])
+        loss_dict = criterion(outputs, targets[1:])
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
         # reduce losses over all GPUs for logging purposes (average loss of all GPUs)
@@ -79,25 +78,20 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 
 @torch.no_grad()
-def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, output_dir):
+def evaluate(model, criterion, data_loader, device):
     model.eval()
     criterion.eval()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Test:'
 
-    iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
-    coco_evaluator = CocoEvaluator(base_ds, iou_types)
-    # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
-
-
-    for samples, targets in metric_logger.log_every(data_loader, 10, header):
-        samples = samples.to(device)
-        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
-        outputs = model(samples)
-        loss_dict = criterion(outputs, targets)
+    for samples, targets, meta in metric_logger.log_every(data_loader, 10, header):
+        samples = samples.to(device)  # feature maps
+        targets = [t.to(device) for t in targets]  # bboxes, actions, activities, one_hot_matrix
+        outputs = model(samples, targets[0], meta)
+        loss_dict = criterion(outputs, targets[1:])
         weight_dict = criterion.weight_dict
 
         # reduce losses over all GPUs for logging purposes
@@ -109,31 +103,13 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         metric_logger.update(loss=sum(loss_dict_reduced_scaled.values()),
                              **loss_dict_reduced_scaled,
                              **loss_dict_reduced_unscaled)
-        metric_logger.update(class_error=loss_dict_reduced['class_error'])
-
-        orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
-        results = postprocessors['bbox'](outputs, orig_target_sizes)
-        if 'segm' in postprocessors.keys():
-            target_sizes = torch.stack([t["size"] for t in targets], dim=0)
-            results = postprocessors['segm'](results, outputs, orig_target_sizes, target_sizes)
-        res = {target['image_id'].item(): output for target, output in zip(targets, results)}
-        if coco_evaluator is not None:
-            coco_evaluator.update(res)
+        # TODO: grouping error
+        metric_logger.update(activity_class_error=loss_dict_reduced['activity_class_error'])
+        metric_logger.update(action_class_error=loss_dict_reduced['action_class_error'])
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    if coco_evaluator is not None:
-        coco_evaluator.synchronize_between_processes()
 
-    # accumulate predictions from all images
-    if coco_evaluator is not None:
-        coco_evaluator.accumulate()
-        coco_evaluator.summarize()
     stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
-    if coco_evaluator is not None:
-        if 'bbox' in postprocessors.keys():
-            stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
-        if 'segm' in postprocessors.keys():
-            stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
-    return stats, coco_evaluator
+    return stats

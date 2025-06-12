@@ -93,7 +93,7 @@ class Joiner(nn.Sequential):
         self.T = position_embedding.T
 
     def forward(self, fm, bbox, valid_areas_b, meta):
-        print(meta)
+        # print(meta)
         roi_boxes, boxes_features, mask, n_max, n_per_frame = self[0](fm, bbox, valid_areas_b, meta)  # backbone
 
         bbox_norm = roi_boxes.clone()
