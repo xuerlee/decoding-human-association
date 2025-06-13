@@ -108,8 +108,8 @@ def evaluate(model, criterion, data_loader, device):
         metric_logger.update(action_class_error=loss_dict_reduced['action_class_error'])
 
     # gather the stats from all processes
-    # metric_logger.synchronize_between_processes()
-    print("Averaged stats:", metric_logger)
+    metric_logger.synchronize_between_processes()
+    # print("Averaged stats:", metric_logger)
 
     stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     return stats
