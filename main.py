@@ -97,7 +97,7 @@ def get_args_parser():
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--eval', default=False, action='store_true')
+    parser.add_argument('--eval', default=True, action='store_true')
     parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters
