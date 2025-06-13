@@ -178,7 +178,7 @@ def main(args):
     if args.eval:
         test_stats = evaluate(model, criterion,
                                               data_loader_val, device)
-        print(test_stats)
+        print('test stats:', test_stats)
         return
 
     print("Start training")
