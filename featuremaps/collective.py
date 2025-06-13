@@ -23,8 +23,8 @@ FRAMES_SIZE = {1: (480, 720), 2: (480, 720), 3: (480, 720), 4: (480, 720), 5: (4
                41: (480, 720), 42: (480, 720), 43: (480, 720), 44: (480, 720)}
 
 def collective_path(fm_root, ann_root):
-    train_seqs = [str(i + 1) for i in range(32)]
-    val_seqs = [str(i + 33) for i in range(12)]
+    val_seqs = [str(i + 1) for i in range(32)]
+    train_seqs = [str(i + 33) for i in range(12)]
 
     # for testing code runing one seq
     # train_seqs = [str(i + 1) for i in range(1)]
