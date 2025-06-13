@@ -34,7 +34,7 @@ class DETR(nn.Module):
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
-        self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
+        # self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
 
         self.backbone = backbone
         self.aux_loss = aux_loss
@@ -79,9 +79,9 @@ class DETR(nn.Module):
         activity_scores = outputs_activity_class.mean(dim=3)  # num_dec_layers, B, num_queries, num_activity_classes
 
         # for grouping based on attention weights
-        attention_weights = attention_weights.transpose(1, 2)  # B*T, n_max, num_queries
-        attention_weights = self.aw_embed(attention_weights)  # B*T, n_max, num_queries
-        attention_weights = attention_weights.transpose(1, 2)  # B*T, num_queries, n_max
+        # attention_weights = attention_weights.transpose(1, 2)  # B*T, n_max, num_queries
+        # attention_weights = self.aw_embed(attention_weights)  # B*T, n_max, num_queries
+        # attention_weights = attention_weights.transpose(1, 2)  # B*T, num_queries, n_max
         attention_weights = attention_weights.view(B, T, self.num_queries, n_max).permute(0, 3, 1, 2)  # B, n_max, T, num_queries
         attention_weights = attention_weights.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_queries
         attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
