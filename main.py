@@ -92,12 +92,12 @@ def get_args_parser():
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
-                        # default='',
-                        default='output_dir/try_group_eval/checkpoint0299.pth',
+                        default='',
+                        # default='output_dir/try_group_eval/checkpoint0299.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--eval', default=True, action='store_true')
+    parser.add_argument('--eval', default=False, action='store_true')
     parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters
@@ -109,7 +109,10 @@ def get_args_parser():
 
 def main(args):
     writer_dir = args.output_dir.split('/')[-1]
-    writer = SummaryWriter(log_dir=f'runs/{writer_dir}')
+    if not eval:
+        writer = SummaryWriter(log_dir=f'runs/{writer_dir}')
+    else:
+        writer = None
     utils.init_distributed_mode(args)
     print("git:\n  {}\n".format(utils.get_sha()))
 
@@ -208,11 +211,15 @@ def main(args):
             model, criterion, data_loader_val, device
         )
 
+        if writer is not None:
+            for k, v in test_stats.items():
+                if isinstance(v, (int, float)):
+                    writer.add_scalar(f"Test/{k}", v, epoch)
+
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                      **{f'test_{k}': v for k, v in test_stats.items()},
                      'epoch': epoch,
                      'n_parameters': n_parameters}
-
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")

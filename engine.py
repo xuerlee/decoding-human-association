@@ -87,7 +87,7 @@ def evaluate(model, criterion, data_loader, device):
     metric_logger.add_meter('action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Test:'
 
-    for samples, targets, meta in metric_logger.log_every(data_loader, 10, header):
+    for iteration, (samples, targets, meta) in enumerate(metric_logger.log_every(data_loader, 10, header)):
         samples = samples.to(device)  # feature maps
         targets = [t.to(device) for t in targets]  # bboxes, actions, activities, one_hot_matrix
         outputs = model(samples, targets[0], meta)
