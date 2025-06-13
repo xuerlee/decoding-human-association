@@ -109,7 +109,7 @@ def get_args_parser():
 
 def main(args):
     writer_dir = args.output_dir.split('/')[-1]
-    if not eval:
+    if not args.eval:
         writer = SummaryWriter(log_dir=f'runs/{writer_dir}')
     else:
         writer = None
