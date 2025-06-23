@@ -32,10 +32,6 @@ def get_args_parser():
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
 
-    # Model parameters
-    parser.add_argument('--frozen_weights', type=str, default=None,
-                        help="Path to the pretrained model. If set, only the mask head will be trained")
-
     # * Transformer
     parser.add_argument('--enc_layers', default=6, type=int,
                         help="Number of encoding layers in the transformer")
@@ -78,7 +74,8 @@ def get_args_parser():
                         default='/home/jiqqi/data/new-new-collective/img_for_fm_fm', type=str)
     parser.add_argument('--ann_path',
                         default='/home/jiqqi/data/social_CAD/anns', type=str)
-    parser.add_argument('--is_training', default=True, type=bool)
+    parser.add_argument('--is_training', default=True, type=bool,
+                        help='data preparation may have differences')
     parser.add_argument('--num_frames', default=10, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
@@ -116,8 +113,6 @@ def main(args):
     utils.init_distributed_mode(args)
     print("git:\n  {}\n".format(utils.get_sha()))
 
-    if args.frozen_weights is not None:
-        assert args.masks, "Frozen training is meant for segmentation only"
     print(args)
 
     device = torch.device(args.device)
@@ -161,10 +156,6 @@ def main(args):
     data_loader_val = DataLoader(dataset_val, args.batch_size, sampler=sampler_val, collate_fn=utils.collate_fn,
                                  drop_last=False, num_workers=args.num_workers)
 
-    if args.frozen_weights is not None:
-        checkpoint = torch.load(args.frozen_weights, map_location='cpu')
-        model_without_ddp.detr.load_state_dict(checkpoint['model'])
-
     output_dir = Path(args.output_dir)
     if args.resume:
         if args.resume.startswith('https'):
@@ -179,8 +170,7 @@ def main(args):
             args.start_epoch = checkpoint['epoch'] + 1
 
     if args.eval:
-        test_stats = evaluate(model, criterion,
-                                              data_loader_val, device)
+        test_stats = evaluate(model, criterion, data_loader_val, device)
         print('test stats:', test_stats)
         return
 
