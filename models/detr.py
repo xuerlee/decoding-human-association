@@ -165,7 +165,7 @@ class SetCriterion(nn.Module):
             class_acc = per_class_accuracy(out_activity_logits[idx], target_classes_o, num_classes=out_activity_logits.shape[-1])
             for i, acc in enumerate(class_acc):
                 if not math.isnan(acc):
-                    losses[f'activity_class_accuracy_{i}'] = acc
+                    losses[f'activity_class_error_{i}'] = 100 - acc
         return losses
 
     def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
@@ -188,7 +188,7 @@ class SetCriterion(nn.Module):
             class_acc = per_class_accuracy(src_logits, tgt_action_ids, num_classes=src_logits.shape[-1])
             for i, acc in enumerate(class_acc):
                 if not math.isnan(acc):
-                    losses[f'action_class_accuracy_{i}'] = acc
+                    losses[f'action_class_error_{i}'] = 100 - acc
         return losses
 
     @torch.no_grad()

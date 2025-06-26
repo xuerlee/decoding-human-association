@@ -62,13 +62,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             writer.add_scalar('Loss/total', loss_value, global_step)
 
             for k, v in loss_dict_reduced_scaled.items():
-                if k.startswith('action_class_accuracy_') or k.startswith('activity_class_accuracy_'):
+                if k.startswith('action_class_error_') or k.startswith('activity_class_error_'):
                     writer.add_scalar(f'Loss_scaled/{k}', v, global_step)
                 else:
                     writer.add_scalar(f'Loss_scaled/{k}', v.item(), global_step)
 
             for k, v in loss_dict_reduced_unscaled.items():
-                if k.startswith('action_class_accuracy_') or k.startswith('activity_class_accuracy_'):
+                if k.startswith('action_class_error_') or k.startswith('activity_class_error_'):
                     writer.add_scalar(f'Loss_unscaled/{k}', v, global_step)
                 else:
                     writer.add_scalar(f'Loss_unscaled/{k}', v.item(), global_step)
@@ -113,7 +113,7 @@ def evaluate(model, criterion, data_loader, device):
         metric_logger.update(activity_class_error=loss_dict_reduced['activity_class_error'])
         metric_logger.update(action_class_error=loss_dict_reduced['action_class_error'])
         for k, v in loss_dict_reduced.items():
-            if k.startswith('action_class_accuracy_') or k.startswith('activity_class_accuracy_') and v is not None:
+            if k.startswith('action_class_error_') or k.startswith('activity_class_error_') and v is not None:
                 metric_logger.update(**{k: v})
 
 
