@@ -188,7 +188,6 @@ class SetCriterion(nn.Module):
             class_acc = per_class_accuracy(src_logits, tgt_action_ids, num_classes=src_logits.shape[-1])
             for i, acc in enumerate(class_acc):
                 if not math.isnan(acc):
-                    print(i)
                     losses[f'action_class_error_{i}'] = 100 - acc
         return losses
 
