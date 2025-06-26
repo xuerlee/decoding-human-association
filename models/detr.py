@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
+import math
 
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list, nested_tensor_from_fm_list,
                        crop_to_original, binary_label_smoothing, accuracy, per_class_accuracy, get_world_size, interpolate,
@@ -163,7 +164,8 @@ class SetCriterion(nn.Module):
 
             class_acc = per_class_accuracy(out_activity_logits[idx], target_classes_o, num_classes=out_activity_logits.shape[-1])
             for i, acc in enumerate(class_acc):
-                losses[f'activity_class_accuracy_{i}'] = acc.item() if not torch.isnan(acc) else None
+                if not math.isnan(acc):
+                    losses[f'activity_class_accuracy_{i}'] = acc
         return losses
 
     def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
@@ -183,10 +185,10 @@ class SetCriterion(nn.Module):
 
         if log:
             losses['action_class_error'] = 100 - accuracy(src_logits, tgt_action_ids)[0]
-
             class_acc = per_class_accuracy(src_logits, tgt_action_ids, num_classes=src_logits.shape[-1])
             for i, acc in enumerate(class_acc):
-                losses[f'action_class_accuracy_{i}'] = acc.item() if not torch.isnan(acc) else None
+                if not math.isnan(acc):
+                    losses[f'action_class_accuracy_{i}'] = acc
         return losses
 
     @torch.no_grad()

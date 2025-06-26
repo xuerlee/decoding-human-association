@@ -483,28 +483,20 @@ def accuracy(output, target, topk=(1,)):
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
-def per_class_accuracy(output, target, num_classes, topk=(1,)):
+def per_class_accuracy(output, target, num_classes):
+    _, pred = output.topk(1, dim=1)
+    pred = pred.squeeze(1)
 
-    if target.numel() == 0:
-        return [torch.zeros([], device=output.device)]
-    maxk = max(topk)
-    batch_size = target.size(0)
-
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-    class_total = torch.zeros(num_classes, device=output.device)
-    class_correct = torch.zeros(num_classes, device=output.device)
-
+    acc_list = []
     for i in range(num_classes):
-        class_mask = target == i
-        class_total[i] = class_mask.sum()
-        class_correct[i] = correct[class_mask].sum()
-
-    acc = 100.0 * class_correct / class_total.clamp(min=1)
-    acc[class_total == 0] = float('nan')
-    return acc
+        mask = target == i
+        total = mask.sum()
+        if total == 0:
+            acc_list.append(float('nan'))
+        else:
+            correct = (pred[mask] == i).sum()
+            acc_list.append(100.0 * correct.item() / total.item())
+    return acc_list
 
 def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None):
     # type: (Tensor, Optional[List[int]], Optional[float], str, Optional[bool]) -> Tensor
