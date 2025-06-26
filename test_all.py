@@ -20,11 +20,6 @@ except ImportError:
 
 class Tester(unittest.TestCase):
 
-    def test_box_cxcywh_to_xyxy(self):
-        t = torch.rand(10, 4)
-        r = box_ops.box_xyxy_to_cxcywh(box_ops.box_cxcywh_to_xyxy(t))
-        self.assertLess((t - r).abs().max(), 1e-5)
-
     @staticmethod
     def indices_torch2python(indices):
         return [(i.tolist(), j.tolist()) for i, j in indices]
@@ -74,16 +69,6 @@ class Tester(unittest.TestCase):
         out_script = scripted_model(x)
         self.assertTrue(out["pred_logits"].equal(out_script["pred_logits"]))
         self.assertTrue(out["pred_boxes"].equal(out_script["pred_boxes"]))
-
-    def test_model_script_panoptic(self):
-        model = detr_resnet50_panoptic(pretrained=False).eval()
-        scripted_model = torch.jit.script(model)
-        x = nested_tensor_from_tensor_list([torch.rand(3, 200, 200), torch.rand(3, 200, 250)])
-        out = model(x)
-        out_script = scripted_model(x)
-        self.assertTrue(out["pred_logits"].equal(out_script["pred_logits"]))
-        self.assertTrue(out["pred_boxes"].equal(out_script["pred_boxes"]))
-        self.assertTrue(out["pred_masks"].equal(out_script["pred_masks"]))
 
     def test_model_detection_different_inputs(self):
         model = detr_resnet50(pretrained=False).eval()

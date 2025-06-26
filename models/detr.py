@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list, nested_tensor_from_fm_list,
-                       crop_to_original, binary_label_smoothing, accuracy, get_world_size, interpolate,
+                       crop_to_original, binary_label_smoothing, accuracy, per_class_accuracy, get_world_size, interpolate,
                        is_dist_avail_and_initialized)
 
 from .backbone import build_backbone
@@ -160,6 +160,10 @@ class SetCriterion(nn.Module):
 
         if log:
             losses['activity_class_error'] = 100 - accuracy(out_activity_logits[idx], target_classes_o)[0]  # 100 - accuracy
+
+            class_acc = per_class_accuracy(out_activity_logits[idx], target_classes_o, num_classes=out_activity_logits.shape[-1])
+            for i, acc in enumerate(class_acc):
+                losses[f'activity_class_accuracy_{i}'] = acc.item() if not torch.isnan(acc) else None
         return losses
 
     def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
@@ -179,6 +183,10 @@ class SetCriterion(nn.Module):
 
         if log:
             losses['action_class_error'] = 100 - accuracy(src_logits, tgt_action_ids)[0]
+
+            class_acc = per_class_accuracy(src_logits, tgt_action_ids, num_classes=src_logits.shape[-1])
+            for i, acc in enumerate(class_acc):
+                losses[f'action_class_accuracy_{i}'] = acc.item() if not torch.isnan(acc) else None
         return losses
 
     @torch.no_grad()
@@ -326,36 +334,6 @@ class SetCriterion(nn.Module):
                     losses.update(l_dict)
 
         return losses
-
-
-class PostProcess(nn.Module):
-    """ This module is for converting the model's outputs"""
-    @torch.no_grad()
-    def forward(self, outputs, target_sizes):
-        """ Perform the computation
-        Parameters:
-            outputs: raw outputs of the model
-            target_sizes: tensor of dimension [batch_size x 2] containing the size of each images of the batch
-                          For evaluation, this must be the original image size (before any data augmentation)
-                          For visualization, this should be the image size after data augment, but before padding
-        """
-
-        out_action_logits, out_activity_logits, out_attention = outputs['pred_action_logits'], outputs['pred_activity_logits'], outputs[attention_weights]
-
-        assert len(out_logits) == len(target_sizes)
-        assert target_sizes.shape[1] == 2
-
-        prob = F.softmax(out_logits, -1)
-        scores, labels = prob[..., :-1].max(-1)
-
-        # and from relative [0, 1] to absolute [0, height] coordinates
-        img_h, img_w = target_sizes.unbind(1)
-        scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
-
-
-        results = [{'scores': s, 'labels': l, 'boxes': b} for s, l, b in zip(scores, labels, boxes)]
-
-        return results
 
 
 class MLP(nn.Module):

@@ -106,6 +106,10 @@ def evaluate(model, criterion, data_loader, device):
         # TODO: grouping error
         metric_logger.update(activity_class_error=loss_dict_reduced['activity_class_error'])
         metric_logger.update(action_class_error=loss_dict_reduced['action_class_error'])
+        for k, v in loss_dict_reduced.items():
+            if k.startswith('action_class_accuracy_') or k.startswith('activity_class_accuracy_') and v is not None:
+                metric_logger.update(**{k: v})
+
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()

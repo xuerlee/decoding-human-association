@@ -204,8 +204,8 @@ class MetricLogger(object):
         if torch.cuda.is_available():
             log_msg = self.delimiter.join([
                 header,
-                '[{0' + space_fmt + '}/{1}]',
-                'eta: {eta}',
+                '[{0' + space_fmt + '}/{1}]',  # occupation of space log_msg.format
+                'eta: {eta}',  # keywords parameters
                 '{meters}',
                 'time: {time}',
                 'data: {data}',
@@ -225,7 +225,7 @@ class MetricLogger(object):
             data_time.update(time.time() - end)
             yield obj
             iter_time.update(time.time() - end)
-            if i % print_freq == 0 or i == len(iterable) - 1:
+            if i % print_freq == 0 or i == len(iterable) - 1:  # print every 10 video clips (including num_frames(10) in per clip)
                 eta_seconds = iter_time.global_avg * (len(iterable) - i)
                 eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
                 if torch.cuda.is_available():
@@ -483,6 +483,28 @@ def accuracy(output, target, topk=(1,)):
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
+def per_class_accuracy(output, target, num_classes, topk=(1,)):
+
+    if target.numel() == 0:
+        return [torch.zeros([], device=output.device)]
+    maxk = max(topk)
+    batch_size = target.size(0)
+
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+    class_total = torch.zeros(num_classes, device=output.device)
+    class_correct = torch.zeros(num_classes, device=output.device)
+
+    for i in range(num_classes):
+        class_mask = target == i
+        class_total[i] = class_mask.sum()
+        class_correct[i] = correct[class_mask].sum()
+
+    acc = 100.0 * class_correct / class_total.clamp(min=1)
+    acc[class_total == 0] = float('nan')
+    return acc
 
 def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None):
     # type: (Tensor, Optional[List[int]], Optional[float], str, Optional[bool]) -> Tensor
