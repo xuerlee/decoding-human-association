@@ -29,6 +29,7 @@ class Backbone(nn.Module):
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1.0, sampling_ratio=-1)
         self.bbox_fc = nn.Sequential(nn.Linear(feature_channels*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
         self.input_proj = nn.Conv2d(feature_channels, hidden_dim, kernel_size=1)
+        self.motion_encoder = Motion3D(in_dim=hidden_dim, out_dim=hidden_dim)
     def forward(self, fm, bbox, valid_areas_b, meta):
         B, T, C, H, W = fm.shape
         # fm.shape: 2, 10, 1392, 31, 46 batch size, num_frames, C, H, W
@@ -62,7 +63,7 @@ class Backbone(nn.Module):
         fm = fm.reshape(B*T, C, H, W)
 
         boxes_features = self.roi_align(fm,
-                                        roi_boxes)  # N (number of individuals in all batch with T frames per frame), D(channels 1392), K, K(crop size)
+                                        roi_boxes)  # N (number of individuals in all batch with T frames per frame(stack together)), D(channels 1392), K, K(crop size)
 
         # input proj (embeddings)
         # # Conv2D
@@ -73,6 +74,9 @@ class Backbone(nn.Module):
         N = boxes_features.shape[0]  # number of inviduals (with T)
         boxes_features = boxes_features.reshape(N, -1)
         boxes_features = self.bbox_fc(boxes_features).reshape(-1, T, self.hidden_dim)  # N(with T), T， hidden_dim(256)  calculate mean along T axis for the transformer output
+
+        # 3D conv
+        boxes_features = self.motion_encoder(boxes_features)
 
         # padding and mask again
         start = 0
@@ -86,6 +90,36 @@ class Backbone(nn.Module):
         mask = mask.reshape(B*T, n_max)  # n_max, B*T, hidden_dim, find connections between individuals per frame
         return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame
 
+
+class Motion3D(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super().__init__()
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.encoder = nn.Sequential(
+            nn.Conv3d(1, 64, kernel_size=(3, 1, 3), padding=(1, 0, 1)),  # temporal + feature
+            nn.BatchNorm3d(64),
+            nn.ReLU(),
+
+            nn.Conv3d(64, 64, kernel_size=(3, 1, 3), padding=(1, 0, 1)),
+            nn.BatchNorm3d(64),
+            nn.ReLU(),
+
+            nn.Conv3d(64, 1, kernel_size=1),  # back to 1 channel for [N, T, D]
+        )
+        self.dropout = nn.Dropout()
+
+    def forward(self, x):  # x: [N, T, D]
+        identity = x
+
+        # Add fake spatial dims: [N, 1, T, 1, D]
+        x = x.unsqueeze(1).unsqueeze(3)
+        x = self.encoder(x)  # [N, 1, T, 1, D]
+        x = x.squeeze(1).squeeze(2)  # [N, T, D]
+        x = self.dropout(x)
+
+        x = x + identity  # residual
+        return x
 
 class Joiner(nn.Sequential):
     def __init__(self, backbone, position_embedding):
