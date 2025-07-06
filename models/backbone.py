@@ -21,7 +21,7 @@ class Backbone(nn.Module):
     RoI Align features for individuals for each frame in one batch;
     """
 
-    def __init__(self, feature_channels, hidden_dim, crop_h, crop_w):
+    def __init__(self, feature_channels, hidden_dim, crop_h, crop_w, n_blocks=3):
         super().__init__()
         self.crop_h = crop_h
         self.crop_w = crop_w
@@ -29,7 +29,7 @@ class Backbone(nn.Module):
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1.0, sampling_ratio=-1)
         self.bbox_fc = nn.Sequential(nn.Linear(feature_channels*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
         self.input_proj = nn.Conv2d(feature_channels, hidden_dim, kernel_size=1)
-        self.motion_encoder = Motion3D(in_dim=hidden_dim, out_dim=hidden_dim)
+        self.motion_encoder = nn.Sequential(*[Motion3DBlock() for _ in range(n_blocks)])
     def forward(self, fm, bbox, valid_areas_b, meta):
         B, T, C, H, W = fm.shape
         # fm.shape: 2, 10, 1392, 31, 46 batch size, num_frames, C, H, W
@@ -91,30 +91,28 @@ class Backbone(nn.Module):
         return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame
 
 
-class Motion3D(nn.Module):
-    def __init__(self, in_dim, out_dim):
+class Motion3DBlock(nn.Module):
+    def __init__(self, mid_dim=64):
         super().__init__()
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-        self.encoder = nn.Sequential(
-            nn.Conv3d(1, 64, kernel_size=(3, 1, 3), padding=(1, 0, 1)),  # temporal + feature
-            nn.BatchNorm3d(64),
+        self.conv3d = nn.Sequential(  # kernel size: for T, H, W; padding size: //2
+            nn.Conv3d(1, mid_dim, kernel_size=(3, 1, 3), padding=(1, 0, 1)),  # temporal + feature
+            nn.BatchNorm3d(mid_dim),
             nn.ReLU(),
 
-            nn.Conv3d(64, 64, kernel_size=(3, 1, 3), padding=(1, 0, 1)),
-            nn.BatchNorm3d(64),
+            nn.Conv3d(mid_dim, mid_dim, kernel_size=(3, 1, 3), padding=(1, 0, 1)),
+            nn.BatchNorm3d(mid_dim),
             nn.ReLU(),
 
-            nn.Conv3d(64, 1, kernel_size=1),  # back to 1 channel for [N, T, D]
+            nn.Conv3d(mid_dim, 1, kernel_size=1),  # back to 1 channel for [N, T, D]
         )
         self.dropout = nn.Dropout()
 
     def forward(self, x):  # x: [N, T, D]
         identity = x
 
-        # Add fake spatial dims: [N, 1, T, 1, D]
+        # Add fake spatial dims: [N, 1, T, 1, D] (match [N, C, T, H, W])
         x = x.unsqueeze(1).unsqueeze(3)
-        x = self.encoder(x)  # [N, 1, T, 1, D]
+        x = self.conv3d(x)  # [N, 1, T, 1, D]
         x = x.squeeze(1).squeeze(2)  # [N, T, D]
         x = self.dropout(x)
 
