@@ -94,7 +94,7 @@ class Backbone(nn.Module):
 class Motion3DBlock(nn.Module):
     def __init__(self, mid_dim=64):
         super().__init__()
-        self.conv3d = nn.Sequential(  # kernel size: for T, H, W; padding size: //2
+        self.conv3d = nn.Sequential(  # mid_dim: C; kernel size: for T, H, W; padding size: //2
             nn.Conv3d(1, mid_dim, kernel_size=(3, 1, 3), padding=(1, 0, 1)),  # temporal + feature
             nn.BatchNorm3d(mid_dim),
             nn.ReLU(),
@@ -110,7 +110,7 @@ class Motion3DBlock(nn.Module):
     def forward(self, x):  # x: [N, T, D]
         identity = x
 
-        # Add fake spatial dims: [N, 1, T, 1, D] (match [N, C, T, H, W])
+        # Add fake spatial dims: [N, 1, T, 1, D] (match [N, C, T, H, W])  actual conv2D along T and D dimensions
         x = x.unsqueeze(1).unsqueeze(3)
         x = self.conv3d(x)  # [N, 1, T, 1, D]
         x = x.squeeze(1).squeeze(2)  # [N, T, D]
@@ -147,5 +147,3 @@ def build_backbone(args):
     model = Joiner(backbone, position_embedding)
     return model
 
-
-# TODO: DELETE backbone and replace it by roi align (maybe at the detr class), rewrite positional encodding part

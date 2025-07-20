@@ -13,8 +13,8 @@ from torch.utils.tensorboard import SummaryWriter
 import os
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
-import featuremaps
 from featuremaps import build_fmset
+from dataset import build_dataset
 
 import util.misc as utils
 from engine import evaluate, train_one_epoch
@@ -69,13 +69,22 @@ def get_args_parser():
                         help="Relative classification weight of the no-object classes (empty groups)")
 
     # feature map preparing & roi align
-    parser.add_argument('--feature_file', default='collective')
+    parser.add_argument('--feature_file', default='collective',
+                        help='choose the dataset: collective or volleyball')
+    parser.add_argument('--input_format', default='image',
+                        help='choose original images or extracted features in numpy format: image or feature')
     parser.add_argument('--feature_map_path',
                         default='/home/jiqqi/data/new-new-collective/img_for_fm_fm', type=str)
+    parser.add_argument('--img_path',
+                        default='/home/jiqqi/data/new-new-collective/ActivityDataset', type=str)
     parser.add_argument('--ann_path',
                         default='/home/jiqqi/data/social_CAD/anns', type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
+    parser.add_argument('--img_w', default=224, type=int,
+                        help='width of resized images')
+    parser.add_argument('--img_h', default=224, type=int,
+                        help='heigh of resized images')
     parser.add_argument('--num_frames', default=10, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
@@ -139,7 +148,12 @@ def main(args):
                                   weight_decay=args.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
 
-    dataset_train, dataset_val = build_fmset(args=args)
+    if args.input_format == 'feature':
+        dataset_train, dataset_val = build_fmset(args=args)
+    elif args.input_format == 'image':
+        dataset_train, dataset_val = build_dataset(args=args)
+    else:
+        raise ValueError(f'import format {args.input_format} not supported, options: image or feature')
 
     if args.distributed:
         sampler_train = DistributedSampler(dataset_train)

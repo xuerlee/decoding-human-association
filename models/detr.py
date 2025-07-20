@@ -9,6 +9,7 @@ from util.misc import (NestedTensor, nested_tensor_from_tensor_list, nested_tens
                        crop_to_original, binary_label_smoothing, accuracy, per_class_accuracy, get_world_size, interpolate,
                        is_dist_avail_and_initialized)
 
+from .backbone_i3d import build_backboneI3D
 from .backbone import build_backbone
 from .matcher import build_matcher
 from .transformer import build_transformer
@@ -42,7 +43,7 @@ class DETR(nn.Module):
 
 
     def forward(self, features: NestedTensor, bboxes: NestedTensor, meta):
-        """samples are NestedTensor of the stacked feature maps before roi align, including feature maps and masks
+        """samples are NestedTensor of the stacked feature maps/images before roi align, including feature maps and masks
 
             It returns a dict with the following elements:
                - "pred_activity_logits (decoder)": the classification logits for activities including no groups for all queries.
@@ -55,7 +56,7 @@ class DETR(nn.Module):
         if isinstance(features, (list, torch.Tensor)):
             features = nested_tensor_from_fm_list(features)
 
-        src_f, mask_f = features.decompose()  # NestedTensor features  B, T, C, H, W
+        src_f, mask_f = features.decompose()  # NestedTensor features/images  B, T, C, H, W
         # valid_areas_f = crop_to_original(mask_f)  # batch size, 4 (ymin ymax xmin xmax)
 
         src_b, mask_b = bboxes.decompose()  # B, n_max, 4
@@ -366,7 +367,12 @@ def build(args):
 
     device = torch.device(args.device)
 
-    backbone = build_backbone(args)
+    if args.input_format == 'feature':
+        backbone = build_backbone(args)
+    elif args.input_format == 'image':
+        backbone = build_backboneI3D(args)
+    else:
+        raise ValueError(f'import format {args.input_format} not supported, options: image or feature')
 
     transformer = build_transformer(args)
 

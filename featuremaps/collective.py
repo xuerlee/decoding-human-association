@@ -26,8 +26,8 @@ def collective_path(fm_root, ann_root):
     train_seqs = [str(i + 1) for i in range(32)]
     # val_seqs = [str(i + 1) for i in range(32)]
     val_seqs = [str(i + 33) for i in range(12)]
-    # val_seqs = [str(44)]
-
+    # val_seqs = [str(42)]
+    #
     # for testing code runing one seq
     # train_seqs = [str(i + 1) for i in range(1)]
     # val_seqs = [str(i + 1) for i in range(1)]
@@ -118,7 +118,7 @@ def collective_all_frames(anns):
     # filtered the first and the last anns
 
 
-class FeatureMapDataset(data.Dataset):
+class Collective_FeatureMapDataset(data.Dataset):
     def __init__(self, anns, frames, feature_path, num_frames=10, is_training=True):
         """
         Args:

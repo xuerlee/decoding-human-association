@@ -4,7 +4,7 @@ import torch
 import torch.utils.data as data
 import torchvision
 
-from .collective import collective_path, collective_read_dataset, collective_all_frames, FeatureMapDataset
+from .collective import collective_path, collective_read_dataset, collective_all_frames, Collective_FeatureMapDataset
 
 def build(args):
     fm_root = Path(args.feature_map_path)
@@ -22,9 +22,9 @@ def build(args):
         test_anns = collective_read_dataset(test_ann_file)
         test_frames = collective_all_frames(test_anns)
 
-        train_dataset = FeatureMapDataset(train_anns, train_frames, args.feature_map_path,
+        train_dataset = Collective_FeatureMapDataset(train_anns, train_frames, args.feature_map_path,
                                           num_frames=args.num_frames, is_training=args.is_training)
-        test_dataset = FeatureMapDataset(test_anns, test_frames, args.feature_map_path,
+        test_dataset = Collective_FeatureMapDataset(test_anns, test_frames, args.feature_map_path,
                                          num_frames=args.num_frames, is_training=args.is_training)
 
     else:
