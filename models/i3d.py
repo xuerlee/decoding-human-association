@@ -150,7 +150,7 @@ class InceptionModule(nn.Module):
         return torch.cat([b0, b1, b2, b3], dim=1)
 
 
-class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_4f features
+class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_4f / mixed_3c features
     """Inception-v1 I3D architecture.
     The model is introduced in:
         Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset
@@ -348,7 +348,7 @@ class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_
     def forward(self, x):
 
         for end_point in self.VALID_ENDPOINTS:  # including prediction and logits
-            if end_point == 'MaxPool3d_5a_2x2':  # can output features from other layers
+            if end_point == 'MaxPool3d_4a_3x3':  # can output features from other layers
                 # out_feature = x
                 break
             # if end_point=='Predictions':
@@ -370,7 +370,8 @@ class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_
         return self.avg_pool(x)
 
 class i3d(nn.Module):
-    def __init__(self, in_channel=832, out_channel=256):
+    def __init__(self, in_channel=480, out_channel=256):
+        # mixed_4f: 832; mixed_3c: 480
         super(i3d, self).__init__()
         self.in_channel = in_channel
         self.out_channel = out_channel
