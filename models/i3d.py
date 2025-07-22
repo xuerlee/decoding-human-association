@@ -348,7 +348,7 @@ class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_
     def forward(self, x):
 
         for end_point in self.VALID_ENDPOINTS:  # including prediction and logits
-            if end_point == 'Mixed_4c':  # can output features from other layers
+            if end_point == 'MaxPool3d_4a_3x3':  # can output features from other layers
                 # out_feature = x
                 break
             # if end_point=='Predictions':
@@ -370,14 +370,14 @@ class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_
         return self.avg_pool(x)
 
 class i3d(nn.Module):
-    def __init__(self, in_channel=512, out_channel=256):
+    def __init__(self, in_channel=480, out_channel=256):
         # mixed_4f: 832; mixed_3c: 480; mixed_4b:512
         super(i3d, self).__init__()
         self.in_channel = in_channel
         self.out_channel = out_channel
         self.i3d = InceptionI3d()  # T / 2 → 10 → 5;  H / 16, W / 16 → 224 → 14
 
-        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (8, 1, 1),
+        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1),
                                         stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
         # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))
@@ -390,6 +390,7 @@ class i3d(nn.Module):
         B, C, T, H, W = x.shape
         x = self.i3d(x)
         x = self.conv1(x)
+        # print(x.shape)
         # x = self.up_conv(x)
         _, C_o, _, FH, FW = x.shape  # B, C_o, T, FH, FW
         x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW)
