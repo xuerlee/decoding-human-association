@@ -351,7 +351,7 @@ class InceptionI3d(nn.Module):  #  output mixed_4b / mixed_3c features + mixed_5
             if end_point == 'MaxPool3d_4a_3x3':  # can output features from other layers
                 action_feat = x
                 # break
-            if end_point == 'Mixed_4c':
+            if end_point == 'MaxPool3d_4a_3x3':
                break
             if end_point in self.end_points:  # without prediction and logits
                 x = self._modules[end_point](x)  # use _modules to work with dataparallel (output mixed_4f layer)
@@ -382,7 +382,7 @@ class i3d(nn.Module):
         # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))
         # self.conv2=nn.ConvTranspose3d(1024, self.out_channel, (9, 1, 1), stride=(1, 1, 1))
-        self.conv2=nn.ConvTranspose3d(512, self.out_channel, (8, 1, 1), stride=(1, 1, 1))
+        self.conv2=nn.ConvTranspose3d(480, self.out_channel, (6, 1, 1), stride=(1, 1, 1))
         self.i3d.load_state_dict(torch.load(
             'models/pretrained_models/rgb_imagenet.pt'))
         # self.i3d.replace_logits(8)
