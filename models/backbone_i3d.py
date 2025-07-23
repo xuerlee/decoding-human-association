@@ -35,8 +35,8 @@ class BackboneI3D(nn.Module):
     def forward(self, img, bbox, valid_areas_b, meta):
         B, T, C, H, W = img.shape
         # img.shape: 2, 10, 3, 224, 224; batch size, num_frames, C, H, W
-        fm = self.i3d(img)  # 20, 256, 14, 14  B*T,C,H,W
-        _, C_o, FH, FW = fm.shape
+        action_fm, logit_fm = self.i3d(img)  # 20, 256, 14, 14  B*T,C,H,W
+        _, C_o, FH, FW = action_fm.shape
 
         # remove the padded boxes before roi align
         all_rois = []
@@ -67,7 +67,7 @@ class BackboneI3D(nn.Module):
         boxes_idx_flat.requires_grad = False
         roi_boxes.requires_grad = False
 
-        boxes_features = self.roi_align(fm,
+        boxes_features = self.roi_align(action_fm,
                                         roi_boxes)  # N (number of individuals in all batch with T frames per frame(stack together)), D(channels 256), K, K(crop size)
         # input proj (embeddings)
         # # Conv2D
@@ -76,7 +76,8 @@ class BackboneI3D(nn.Module):
         # boxes_features = boxes_features.flatten(2).permute(2, 0, 1)  # faltten from 2 dim to the last dim: 49, N, 256
         # FC
         N = boxes_features.shape[0]  # number of inviduals (with T)
-        boxes_features = boxes_features.reshape(N, -1)
+        boxes_features = torch.cat((boxes_features, logit_fm), dim=0)
+        boxes_features = boxes_features.reshape(N+B*T, -1)
         boxes_features = self.bbox_fc(boxes_features).reshape(-1, T, self.hidden_dim)  # N(with T), T， hidden_dim(256)  calculate mean along T axis for the transformer output
 
         # padding and mask again

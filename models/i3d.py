@@ -150,7 +150,7 @@ class InceptionModule(nn.Module):
         return torch.cat([b0, b1, b2, b3], dim=1)
 
 
-class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_4f / mixed_3c features
+class InceptionI3d(nn.Module):  #  output mixed_4b / mixed_3c features + mixed_5c features
     """Inception-v1 I3D architecture.
     The model is introduced in:
         Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset
@@ -319,9 +319,9 @@ class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_
         self.set_param()
 
     def set_param(self):
-        for end_point in self.INVALID:
-            for param in self.end_points[end_point].parameters():
-                param.requires_grad=False
+        # for end_point in self.INVALID:
+        #     for param in self.end_points[end_point].parameters():
+        #         param.requires_grad=False
         for param in self.logits.parameters():
             param.requires_grad = False
 
@@ -349,8 +349,8 @@ class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_
 
         for end_point in self.VALID_ENDPOINTS:  # including prediction and logits
             if end_point == 'MaxPool3d_4a_3x3':  # can output features from other layers
-                # out_feature = x
-                break
+                action_feat = x
+                # break
             # if end_point=='Predictions':
             #    break
             if end_point in self.end_points:  # without prediction and logits
@@ -361,7 +361,7 @@ class InceptionI3d(nn.Module):  # without 5b/5c layer updating and output mixed_
         #     logits = x.squeeze(3).squeeze(3)
         # logits is batch X time X classes, which is what we want to work with
 
-        return x
+        return action_feat, x
 
     def extract_features(self, x):
         for end_point in self.VALID_ENDPOINTS:
@@ -381,6 +381,7 @@ class i3d(nn.Module):
                                         stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
         # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))
+        self.conv2=nn.ConvTranspose3d(1024, self.out_channel, (9, 1, 1), stride=(1, 1, 1))
         self.i3d.load_state_dict(torch.load(
             'models/pretrained_models/rgb_imagenet.pt'))
         # self.i3d.replace_logits(8)
@@ -388,14 +389,16 @@ class i3d(nn.Module):
     def forward(self, x):  # B, T, C, H, W = x.shape
         x = x.permute(0, 2, 1, 3, 4)
         B, C, T, H, W = x.shape
-        x = self.i3d(x)
-        x = self.conv1(x)
+        action_feat, x = self.i3d(x)
+        action_feat = self.conv1(action_feat)
         # print(x.shape)
-        # x = self.up_conv(x)
-        _, C_o, _, FH, FW = x.shape  # B, C_o, T, FH, FW
-        x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW)
-        # B*T,C,H,W
-        return x
+        _, C_o, _, FH, FW = action_feat.shape  # B, C_o, T, FH, FW
+        action_feat = action_feat.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW)  # B*T,C,H,W
+
+        x = self.conv2(x)  # B,11,256,45,80
+        _, C_o2, _, FH2, FW2 = x.shape
+        x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o2, FH2, FW2)
+        return action_feat, x
 
 
 if __name__=="__main__":
