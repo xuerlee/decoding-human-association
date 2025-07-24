@@ -150,7 +150,7 @@ class InceptionModule(nn.Module):
         return torch.cat([b0, b1, b2, b3], dim=1)
 
 
-class InceptionI3d(nn.Module):  #  output mixed_4b / mixed_3c features + mixed_5c features
+class InceptionI3d(nn.Module):  #  output mixed_4b / mixed_3c features + mixed_5c/... global features
     """Inception-v1 I3D architecture.
     The model is introduced in:
         Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset
@@ -351,7 +351,7 @@ class InceptionI3d(nn.Module):  #  output mixed_4b / mixed_3c features + mixed_5
             if end_point == 'MaxPool3d_4a_3x3':  # can output features from other layers
                 action_feat = x
                 # break
-            if end_point == 'MaxPool3d_4a_3x3':
+            if end_point == 'Mixed_4c':
                break
             if end_point in self.end_points:  # without prediction and logits
                 x = self._modules[end_point](x)  # use _modules to work with dataparallel (output mixed_4f layer)
@@ -382,7 +382,7 @@ class i3d(nn.Module):
         # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))
         # self.conv2=nn.ConvTranspose3d(1024, self.out_channel, (9, 1, 1), stride=(1, 1, 1))
-        self.conv2=nn.ConvTranspose3d(480, self.out_channel, (6, 1, 1), stride=(1, 1, 1))
+        self.conv2=nn.ConvTranspose3d(512, self.out_channel, (8, 1, 1), stride=(1, 1, 1))
         self.i3d.load_state_dict(torch.load(
             'models/pretrained_models/rgb_imagenet.pt'))
         # self.i3d.replace_logits(8)
@@ -403,11 +403,248 @@ class i3d(nn.Module):
         return action_feat, x
 
 
-if __name__=="__main__":
-    input=torch.rand(4,3,7,720,1280)
-    #model=InceptionI3d(in_channels=3)
-    #model.load_state_dict(torch.load('/Users/lishuaicheng/Documents/group-activity-transformer-dist_tb_v23/checkpoint/rgb_imagenet.pt'))
-    #action=model(input)
-    model=i3d(832,256)
-    action=model(input)
-    print(action.shape)
+class InceptionI3d_noglobal(nn.Module):  #  output mixed_4b / mixed_3c features without 5b/5c updating
+    """Inception-v1 I3D architecture.
+    The model is introduced in:
+        Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset
+        Joao Carreira, Andrew Zisserman
+        https://arxiv.org/pdf/1705.07750v1.pdf.
+    See also the Inception architecture, introduced in:
+        Going deeper with convolutions
+        Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet, Scott Reed,
+        Dragomir Anguelov, Dumitru Erhan, Vincent Vanhoucke, Andrew Rabinovich.
+        http://arxiv.org/pdf/1409.4842v1.pdf.
+    """
+
+    # Endpoints of the model in order. During construction, all the endpoints up
+    # to a designated `final_endpoint` are returned in a dictionary as the
+    # second return value.
+    VALID_ENDPOINTS = (
+        'Conv3d_1a_7x7',
+        'MaxPool3d_2a_3x3',
+        'Conv3d_2b_1x1',
+        'Conv3d_2c_3x3',
+        'MaxPool3d_3a_3x3',
+        'Mixed_3b',
+        'Mixed_3c',
+        'MaxPool3d_4a_3x3',
+        'Mixed_4b',
+        'Mixed_4c',
+        'Mixed_4d',
+        'Mixed_4e',
+        'Mixed_4f',
+        'MaxPool3d_5a_2x2',
+        'Mixed_5b',
+        'Mixed_5c',
+        'Logits',
+        'Predictions',
+    )
+    INVALID=(
+        'MaxPool3d_5a_2x2',
+        'Mixed_5b',
+        'Mixed_5c',
+        #'Logits',
+        #'Predictions'
+    )
+
+    def __init__(self, num_classes=400, spatial_squeeze=True,
+                 final_endpoint='Logits', name='inception_i3d', in_channels=3, dropout_keep_prob=0.5):
+        """Initializes I3D model instance.
+        Args:
+          num_classes: The number of outputs in the logit layer (default 400, which
+              matches the Kinetics dataset).
+          spatial_squeeze: Whether to squeeze the spatial dimensions for the logits
+              before returning (default True).
+          final_endpoint: The model contains many possible endpoints.
+              `final_endpoint` specifies the last endpoint for the model to be built
+              up to. In addition to the output at `final_endpoint`, all the outputs
+              at endpoints up to `final_endpoint` will also be returned, in a
+              dictionary. `final_endpoint` must be one of
+              InceptionI3d.VALID_ENDPOINTS (default 'Logits').
+          name: A string (optional). The name of this module.
+        Raises:
+          ValueError: if `final_endpoint` is not recognized.
+        """
+
+        if final_endpoint not in self.VALID_ENDPOINTS:
+            raise ValueError('Unknown final endpoint %s' % final_endpoint)
+
+        super(InceptionI3d_noglobal, self).__init__()
+
+        self._num_classes = num_classes
+        self._spatial_squeeze = spatial_squeeze
+        self._final_endpoint = final_endpoint
+        self.logits = None
+
+        if self._final_endpoint not in self.VALID_ENDPOINTS:
+            raise ValueError('Unknown final endpoint %s' % self._final_endpoint)
+
+        self.end_points = {}
+        end_point = 'Conv3d_1a_7x7'
+        self.end_points[end_point] = Unit3D(in_channels=in_channels, output_channels=64, kernel_shape=[7, 7, 7],
+                                            stride=(2, 2, 2), padding=(3, 3, 3), name=name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'MaxPool3d_2a_3x3'
+        self.end_points[end_point] = MaxPool3dSamePadding(kernel_size=[1, 3, 3], stride=(1, 2, 2),
+                                                          padding=0)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Conv3d_2b_1x1'
+        self.end_points[end_point] = Unit3D(in_channels=64, output_channels=64, kernel_shape=[1, 1, 1], padding=0,
+                                            name=name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Conv3d_2c_3x3'
+        self.end_points[end_point] = Unit3D(in_channels=64, output_channels=192, kernel_shape=[3, 3, 3], padding=1,
+                                            name=name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'MaxPool3d_3a_3x3'
+        self.end_points[end_point] = MaxPool3dSamePadding(kernel_size=[1, 3, 3], stride=(1, 2, 2),
+                                                          padding=0)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_3b'
+        self.end_points[end_point] = InceptionModule(192, [64, 96, 128, 16, 32, 32], name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_3c'
+        self.end_points[end_point] = InceptionModule(256, [128, 128, 192, 32, 96, 64], name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'MaxPool3d_4a_3x3'
+        self.end_points[end_point] = MaxPool3dSamePadding(kernel_size=[3, 3, 3], stride=(2, 2, 2),
+                                                          padding=0)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_4b'
+        self.end_points[end_point] = InceptionModule(128 + 192 + 96 + 64, [192, 96, 208, 16, 48, 64], name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_4c'
+        self.end_points[end_point] = InceptionModule(192 + 208 + 48 + 64, [160, 112, 224, 24, 64, 64], name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_4d'
+        self.end_points[end_point] = InceptionModule(160 + 224 + 64 + 64, [128, 128, 256, 24, 64, 64], name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_4e'
+        self.end_points[end_point] = InceptionModule(128 + 256 + 64 + 64, [112, 144, 288, 32, 64, 64], name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_4f'
+        self.end_points[end_point] = InceptionModule(112 + 288 + 64 + 64, [256, 160, 320, 32, 128, 128],
+                                                     name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'MaxPool3d_5a_2x2'
+        self.end_points[end_point] = MaxPool3dSamePadding(kernel_size=[2, 2, 2], stride=(2, 2, 2),
+                                                          padding=0)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_5b'
+        self.end_points[end_point] = InceptionModule(256 + 320 + 128 + 128, [256, 160, 320, 32, 128, 128],
+                                                     name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Mixed_5c'
+        self.end_points[end_point] = InceptionModule(256 + 320 + 128 + 128, [384, 192, 384, 48, 128, 128],
+                                                     name + end_point)
+        if self._final_endpoint == end_point: return
+
+        end_point = 'Logits'
+        self.avg_pool = nn.AvgPool3d(kernel_size=[2, 7, 7],
+                                     stride=(1, 1, 1))
+        self.dropout = nn.Dropout(dropout_keep_prob)
+        self.logits = Unit3D(in_channels=384 + 384 + 128 + 128, output_channels=self._num_classes,
+                             kernel_shape=[1, 1, 1],
+                             padding=0,
+                             activation_fn=None,
+                             use_batch_norm=False,
+                             use_bias=True,
+                             name='logits')
+
+
+
+        self.build()
+        self.set_param()
+
+    def set_param(self):
+        for end_point in self.INVALID:
+            for param in self.end_points[end_point].parameters():
+                param.requires_grad=False
+        for param in self.logits.parameters():
+            param.requires_grad = False
+
+        for param in self.avg_pool.parameters():
+            param.requires_grad = False
+        for param in self.dropout.parameters():
+            param.requires_grad = False
+
+
+    def replace_logits(self, num_classes):
+        self._num_classes = num_classes
+        self.logits = Unit3D(in_channels=384 + 384 + 128 + 128, output_channels=self._num_classes,
+                             kernel_shape=[1, 1, 1],
+                             padding=0,
+                             activation_fn=None,
+                             use_batch_norm=False,
+                             use_bias=True,
+                             name='logits')
+
+    def build(self):
+        for k in self.end_points.keys():
+            self.add_module(k, self.end_points[k])
+
+    def forward(self, x):
+
+        for end_point in self.VALID_ENDPOINTS:  # including prediction and logits
+            if end_point == 'MaxPool3d_5a_2x2':  # can output features from other layers
+                break
+            # if end_point == 'MaxPool3d_4a_3x3':
+            #    break
+            if end_point in self.end_points:  # without prediction and logits
+                x = self._modules[end_point](x)  # use _modules to work with dataparallel (output mixed_4f layer)
+
+        # x = self.logits(self.dropout(self.avg_pool(x)))
+        # if self._spatial_squeeze:
+        #     logits = x.squeeze(3).squeeze(3)
+        # logits is batch X time X classes, which is what we want to work with
+
+        return x
+
+    def extract_features(self, x):
+        for end_point in self.VALID_ENDPOINTS:
+            if end_point in self.end_points:
+                x = self._modules[end_point](x)
+        return self.avg_pool(x)
+
+class i3d_noglobal(nn.Module):
+    def __init__(self, in_channel=832, out_channel=256):
+        # mixed_4f: 832; mixed_3c: 480; mixed_4b: 512; mixed_5c: 1024
+        super(i3d_noglobal, self).__init__()
+        self.in_channel = in_channel
+        self.out_channel = out_channel
+        self.i3d = InceptionI3d_noglobal()  # T / 2 → 10 → 5;  H / 16, W / 16 → 224 → 14
+
+        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (8, 1, 1),
+                                        stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
+        # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
+        # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))
+        # self.conv2=nn.ConvTranspose3d(1024, self.out_channel, (9, 1, 1), stride=(1, 1, 1))
+        # self.conv2=nn.ConvTranspose3d(480, self.out_channel, (6, 1, 1), stride=(1, 1, 1))
+        self.i3d.load_state_dict(torch.load(
+            'models/pretrained_models/rgb_imagenet.pt'))
+        # self.i3d.replace_logits(8)
+
+    def forward(self, x):  # B, T, C, H, W = x.shape
+        x = x.permute(0, 2, 1, 3, 4)
+        B, C, T, H, W = x.shape
+        x = self.i3d(x)
+        x = self.conv1(x)
+        # print(x.shape)
+        _, C_o, _, FH, FW = x.shape  # B, C_o, T, FH, FW
+        x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW)  # B*T,C,H,W
+        return x

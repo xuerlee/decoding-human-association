@@ -99,7 +99,7 @@ def get_args_parser():
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
                         default='',
-                        # default='output_dir/try_group_eval/checkpoint0299.pth',
+                        # default='output_dir/i3d/i3d_action_enc2_3c_global4b/checkpoint0299.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -184,7 +184,8 @@ def main(args):
             args.start_epoch = checkpoint['epoch'] + 1
 
     if args.eval:
-        test_stats = evaluate(model, criterion, data_loader_val, device)
+        save_path = args.resume.split('/checkpoint')[0]
+        test_stats = evaluate(model, criterion, data_loader_val, device, save_path, if_confuse=True)
         print('test stats:', test_stats)
         return
 
@@ -212,7 +213,7 @@ def main(args):
                 }, checkpoint_path)
 
         test_stats = evaluate(
-            model, criterion, data_loader_val, device
+            model, criterion, data_loader_val, device, save_path, if_confuse=False
         )
 
         if writer is not None:

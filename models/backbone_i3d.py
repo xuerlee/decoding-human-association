@@ -13,7 +13,7 @@ from torchvision.ops import RoIAlign
 from typing import Dict, List
 from util.misc import NestedTensor, is_main_process
 
-from .i3d import i3d
+from .i3d import i3d, i3d_noglobal
 from .position_encoding import build_position_encoding
 
 
@@ -27,7 +27,8 @@ class BackboneI3D(nn.Module):
         self.crop_h = crop_h
         self.crop_w = crop_w
         self.hidden_dim = hidden_dim
-        self.i3d = i3d(out_channel=hidden_dim)
+        self.i3d = i3d_noglobal(out_channel=hidden_dim)
+        # self.i3d = i3d(out_channel=hidden_dim)
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1.0, sampling_ratio=-1)
         self.bbox_fc = nn.Sequential(nn.Linear(hidden_dim*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
         self.input_proj = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
@@ -35,7 +36,8 @@ class BackboneI3D(nn.Module):
     def forward(self, img, bbox, valid_areas_b, meta):
         B, T, C, H, W = img.shape
         # img.shape: 2, 10, 3, 224, 224; batch size, num_frames, C, H, W
-        action_fm, global_fm = self.i3d(img)  # 20, 256, 14, 14  B*T,C,H,W
+        action_fm = self.i3d(img)
+        # action_fm, global_fm = self.i3d(img)  # 20, 256, 14, 14  B*T,C,H,W
         _, C_o, FH, FW = action_fm.shape
 
         # remove the padded boxes before roi align
@@ -69,19 +71,25 @@ class BackboneI3D(nn.Module):
 
         boxes_features = self.roi_align(action_fm,
                                         roi_boxes)  # N (number of individuals in all batch with T frames per frame(stack together)), D(channels 256), K, K(crop size)
+
         # input proj (embeddings)
         # # Conv2D
         # boxes_features = self.input_proj(boxes_features)  # N(with T), 256, 7, 7
         # boxes_features = boxes_features.reshape(-1, T, self.hidden_dim, self.crop_h, self.crop_w)  # N(without T), T, hidden dim, crop size, crop size
         # boxes_features = boxes_features.flatten(2).permute(2, 0, 1)  # faltten from 2 dim to the last dim: 49, N, 256
-        # FC
+
+        # FC (embeddings)
         N = boxes_features.shape[0]  # number of inviduals (with T)
         # boxes_features = torch.cat((boxes_features, global_fm), dim=0)  # only available when global fm is from mixed_5c
         # boxes_features = boxes_features.reshape(N+B*T, -1)
         boxes_features = boxes_features.reshape(N, -1)
         boxes_features = self.bbox_fc(boxes_features)
-        global_features = global_fm.mean(dim=[2, 3])
-        boxes_features = torch.cat((boxes_features, global_features), dim=0).reshape(-1, T, self.hidden_dim)  # N(with T)+, T， hidden_dim(256)  calculate mean along T axis for the transformer output
+
+        boxes_features = boxes_features.reshape(-1, T, self.hidden_dim)
+
+        # add global features
+        # global_features = global_fm.mean(dim=[2, 3])
+        # boxes_features = torch.cat((boxes_features, global_features), dim=0).reshape(-1, T, self.hidden_dim)  # N(with T)+, T， hidden_dim(256)  calculate mean along T axis for the transformer output
 
         # padding and mask again
         start = 0

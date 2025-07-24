@@ -13,6 +13,10 @@ import pickle
 from packaging import version
 from typing import Optional, List
 
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+
 import torch
 import torch.distributed as dist
 from torch import Tensor
@@ -497,6 +501,42 @@ def per_class_accuracy(output, target, num_classes):
             correct = (pred[mask] == i).sum()
             acc_list.append(100.0 * correct.item() / total.item())
     return acc_list
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+
+
+def plot_confusion_matrix(y_true, y_pred, save_path, class_names=None, normalize=True, figsize=(10, 8), cmap="Blues"):
+    """
+    make confusion matrix and normalize
+    """
+    labels = list(range(len(class_names)))  # sort according to the order of classes
+
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+    if normalize:
+        with np.errstate(all='ignore'):  # avoid 0 warning
+            cm = cm.astype('float') / cm.sum(axis=1, keepdims=True)
+            cm = np.nan_to_num(cm)  # transfer nan to 0
+
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+    fig, ax = plt.subplots(figsize=figsize)
+    disp.plot(include_values=True, cmap=cmap, ax=ax, xticks_rotation=45)
+    ax.set_title("Normalized Confusion Matrix" if normalize else "Confusion Matrix")
+    save_path = save_path + '/confusion_matrix.jpg'
+    plt.savefig(save_path, bbox_inches="tight")
+    # plt.title("Normalized Confusion Matrix" if normalize else "Confusion Matrix")
+    # plt.tight_layout()
+    # plt.show()
+
+
+def print_classification_report(y_true, y_pred, class_names=None):
+    """
+    print precision, recall, f1-score of each class
+    """
+    print(classification_report(y_true, y_pred, target_names=class_names))
+
 
 def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None):
     # type: (Tensor, Optional[List[int]], Optional[float], str, Optional[bool]) -> Tensor

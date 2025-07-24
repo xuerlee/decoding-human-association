@@ -9,6 +9,12 @@ from typing import Iterable
 import torch
 
 import util.misc as utils
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+
+action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
+activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -85,9 +91,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 
 @torch.no_grad()
-def evaluate(model, criterion, data_loader, device):
+def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False):
     model.eval()
     criterion.eval()
+
+    all_action_preds = []
+    all_action_gts = []
 
     metric_logger = utils.MetricLogger(delimiter="  ")
     # metric_logger.add_meter('activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
@@ -110,6 +119,7 @@ def evaluate(model, criterion, data_loader, device):
         metric_logger.update(loss=sum(loss_dict_reduced_scaled.values()),
                              **loss_dict_reduced_scaled,
                              **loss_dict_reduced_unscaled)
+
         # TODO: grouping error
         # metric_logger.update(activity_class_error=loss_dict_reduced['activity_class_error'])
         metric_logger.update(action_class_error=loss_dict_reduced['action_class_error'])
@@ -117,6 +127,18 @@ def evaluate(model, criterion, data_loader, device):
             if k.startswith('action_class_error_') or k.startswith('activity_class_error_') and v is not None:
                 metric_logger.update(**{k: v})
 
+        # for confusion matrix
+        if if_confuse:
+            pred_action_logits = outputs['pred_action_logits']
+            action_gts = targets[1].decompose()[0].cpu().numpy()
+            for i, pred_action_logit in enumerate(pred_action_logits):
+                pred_action_logit = pred_action_logits[i][~(pred_action_logits[i] == 0).all(dim=1)]
+                pred_action = pred_action_logit.argmax(dim=-1).cpu().numpy()
+                all_action_preds.extend(pred_action)
+                action_gt = action_gts[i][~(action_gts[i] == -1)]
+                all_action_gts.extend(action_gt)
+    if if_confuse:
+        utils.plot_confusion_matrix(all_action_gts, all_action_preds, save_path, class_names=action_names)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
