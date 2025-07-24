@@ -183,8 +183,8 @@ def main(args):
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             args.start_epoch = checkpoint['epoch'] + 1
 
+    save_path = args.resume.split('/checkpoint')[0]
     if args.eval:
-        save_path = args.resume.split('/checkpoint')[0]
         test_stats = evaluate(model, criterion, data_loader_val, device, save_path, if_confuse=True)
         print('test stats:', test_stats)
         return
