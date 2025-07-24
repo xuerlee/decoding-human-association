@@ -99,10 +99,10 @@ class BackboneI3D(nn.Module):
             boxes_features_padding[i*n_max: i*n_max+n, :, :].copy_(boxes_features[start: start+n, :, :])
             mask[i, :, :n] = False
             start += n
-        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim).permute(1, 0, 2)
-        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim)
-        # mask = mask.reshape(B*T, n_max)  # n_max, B*T, hidden_dim, find connections between individuals per frame
-        mask = mask.reshape(B*T, n_max).permute(1, 0)
+        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim).permute(1, 0, 2)
+        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim)
+        mask = mask.reshape(B*T, n_max)  # n_max, B*T, hidden_dim, find connections between individuals per frame
+        # mask = mask.reshape(B*T, n_max).permute(1, 0)
         return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame, (FH, FW)
 
 class Joiner(nn.Sequential):

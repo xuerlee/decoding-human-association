@@ -15,6 +15,7 @@ os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 import featuremaps
 from featuremaps import build_fmset
+from dataset import build_dataset
 
 import util.misc as utils
 from engine import evaluate, train_one_epoch
@@ -62,15 +63,22 @@ def get_args_parser():
                         help="BCE error between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
 
     # feature map preparing & roi align
-    parser.add_argument('--feature_file', default='collective')
-    parser.add_argument('--img_path',
-                        default='/home/jiqqi/data/new-new-collective/ActivityDataset', type=str)
+    parser.add_argument('--feature_file', default='collective',
+                        help='choose the dataset: collective or volleyball')
+    parser.add_argument('--input_format', default='image',
+                        help='choose original images or extracted features in numpy format: image or feature')
     parser.add_argument('--feature_map_path',
                         default='/home/jiqqi/data/new-new-collective/img_for_fm_fm', type=str)
+    parser.add_argument('--img_path',
+                        default='/home/jiqqi/data/new-new-collective/ActivityDataset', type=str)
     parser.add_argument('--ann_path',
                         default='/home/jiqqi/data/social_CAD/anns', type=str)
-    parser.add_argument('--is_training', default=False, type=bool,
+    parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
+    parser.add_argument('--img_w', default=224, type=int,
+                        help='width of resized images')
+    parser.add_argument('--img_h', default=224, type=int,
+                        help='heigh of resized images')
     parser.add_argument('--num_frames', default=10, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
@@ -78,15 +86,17 @@ def get_args_parser():
     parser.add_argument('--roi_align', default=[7, 7], type=int,  # openpifpaf output
                         help='size of roi_align')
 
-    parser.add_argument('--output_dir', default='output_imgs/3dblocks/train',
+    parser.add_argument('--output_dir', default='output_imgs/i3d/i3d_action_enc6_4f/test',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
                         # default='',
-                        default='output_dir/3dblocks/checkpoint0299.pth',
+                        default='output_dir/i3d/i3d_action_enc6_4f/checkpoint0299.pth',
                         help='resume from checkpoint')
+    parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
+                        help='start epoch')
     parser.add_argument('--eval', default=True, action='store_true')
     parser.add_argument('--num_workers', default=2, type=int)
 
@@ -122,6 +132,13 @@ def main(args):
     print('number of params:', n_parameters)
 
     dataset_train, dataset_val = build_fmset(args=args)
+
+    if args.input_format == 'feature':
+        dataset_train, dataset_val = build_fmset(args=args)
+    elif args.input_format == 'image':
+        dataset_train, dataset_val = build_dataset(args=args)
+    else:
+        raise ValueError(f'import format {args.input_format} not supported, options: image or feature')
 
     if args.distributed:
         sampler_train = DistributedSampler(dataset_train)

@@ -99,7 +99,7 @@ def get_args_parser():
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
                         default='',
-                        # default='output_dir/i3d/i3d_action_enc2_3c_global4b/checkpoint0299.pth',
+                        # default='output_dir/i3d/i3d_action_enc6_4f_Tattention/checkpoint0299.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
