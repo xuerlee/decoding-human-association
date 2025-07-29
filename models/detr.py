@@ -37,7 +37,7 @@ class DETR(nn.Module):
         self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
         self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
-
+        self.dropout = nn.Dropout(p=0.5)  # set zeros randomly, no influences on valid mask
         self.backbone = backbone
         self.aux_loss = aux_loss
 
@@ -70,8 +70,10 @@ class DETR(nn.Module):
         T = src_f.shape[1]
         n_max = src_b.shape[1]
         boxes_features = boxes_features.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
+        boxes_features = self.dropout(boxes_features)
         mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
         outputs_action_class = self.action_class_embed(boxes_features)  # B, n_max, T, num_action_classes
+        outputs_action_class = self.dropout(outputs_action_class)
         outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max
         action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
