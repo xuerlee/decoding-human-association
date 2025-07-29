@@ -31,7 +31,7 @@ class DETR(nn.Module):
         """
         super().__init__()
         self.num_queries = num_queries
-        self.transformer = transformer
+        # self.transformer = transformer
         self.hidden_dim = transformer.d_model
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
@@ -63,41 +63,56 @@ class DETR(nn.Module):
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
         boxes_features, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B*T, n_max
         # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
-        hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
+        # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
 
-        # individual action classfication
+        # without Transformer (for debug)
         B = src_f.shape[0]
         T = src_f.shape[1]
         n_max = src_b.shape[1]
-        memory = memory.view(B, T, n_max, self.hidden_dim).permute(0, 2, 1, 3)  # B, n_max, T, hidden_dim
-        # memory = memory.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
+        boxes_features = boxes_features.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
         mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
-        # mask = ~mask.view(n_max, B, T).permute(1, 0, 2)  # B, n_max, T
-        outputs_action_class = self.action_class_embed(memory)  # B, n_max, T, num_action_classes
+        outputs_action_class = self.action_class_embed(boxes_features)  # B, n_max, T, num_action_classes
         outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max
         action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
+        out = {'pred_action_logits': action_scores}
 
-        # group activity classification
-        hs = hs.view(-1, B, T, self.num_queries, self.hidden_dim).permute(0, 1, 3, 2, 4)
-        # hs = hs.view(-1, n_max, self.num_queries, self.hidden_dim)
-        outputs_activity_class = self.activity_class_embed(hs)  # num_dec_layers, B, num_queries, T, num_activity_classes
-        activity_scores = outputs_activity_class.mean(dim=3)  # num_dec_layers, B, num_queries, num_activity_classes
 
-        # for grouping based on attention weights
-        attention_weights = attention_weights.transpose(1, 2)  # B*T, n_max, num_queries
-        attention_weights = self.aw_embed(attention_weights)  # B*T, n_max, num_queries
-        attention_weights = attention_weights.transpose(1, 2)  # B*T, num_queries, n_max
-        attention_weights = attention_weights.view(B, T, self.num_queries, n_max).permute(0, 3, 1, 2)  # B, n_max, T, num_queries
-        # attention_weights = attention_weights.view(n_max, self.num_queries, B, T).permute(2, 0, 3, 1)  # B, n_max, T, num_queries
-        attention_weights = attention_weights.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_queries
-        attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
-        attention_weights = attention_weights * mask  # mask: B*T, n_max, num_queries
-
-        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
-
-        if self.aux_loss:
-            out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
+        # # *****************
+        # # individual action classfication
+        # B = src_f.shape[0]
+        # T = src_f.shape[1]
+        # n_max = src_b.shape[1]
+        # memory = memory.view(B, T, n_max, self.hidden_dim).permute(0, 2, 1, 3)  # B, n_max, T, hidden_dim
+        # # memory = memory.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
+        # mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
+        # # mask = ~mask.view(n_max, B, T).permute(1, 0, 2)  # B, n_max, T
+        # outputs_action_class = self.action_class_embed(memory)  # B, n_max, T, num_action_classes
+        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        # valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max
+        # action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
+        #
+        # # group activity classification
+        # hs = hs.view(-1, B, T, self.num_queries, self.hidden_dim).permute(0, 1, 3, 2, 4)
+        # # hs = hs.view(-1, n_max, self.num_queries, self.hidden_dim)
+        # outputs_activity_class = self.activity_class_embed(hs)  # num_dec_layers, B, num_queries, T, num_activity_classes
+        # activity_scores = outputs_activity_class.mean(dim=3)  # num_dec_layers, B, num_queries, num_activity_classes
+        #
+        # # for grouping based on attention weights
+        # attention_weights = attention_weights.transpose(1, 2)  # B*T, n_max, num_queries
+        # attention_weights = self.aw_embed(attention_weights)  # B*T, n_max, num_queries
+        # attention_weights = attention_weights.transpose(1, 2)  # B*T, num_queries, n_max
+        # attention_weights = attention_weights.view(B, T, self.num_queries, n_max).permute(0, 3, 1, 2)  # B, n_max, T, num_queries
+        # # attention_weights = attention_weights.view(n_max, self.num_queries, B, T).permute(2, 0, 3, 1)  # B, n_max, T, num_queries
+        # attention_weights = attention_weights.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_queries
+        # attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
+        # attention_weights = attention_weights * mask  # mask: B*T, n_max, num_queries
+        #
+        # out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
+        #
+        # if self.aux_loss:
+        #     out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
+        # # *******************
         return out
 
     @torch.jit.unused
@@ -173,8 +188,8 @@ class SetCriterion(nn.Module):
                     losses[f'activity_class_error_{i}'] = 100 - acc
         return losses
 
-    def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
-    # def loss_action_labels(self, outputs, targets, log=True):
+    # def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
+    def loss_action_labels(self, outputs, targets, log=True):
         """individual action lassification loss (NLL)
         targets dicts must contain the key "pred_action_logits" containing a tensor of dim [nb_target_boxes]
         """
@@ -291,8 +306,8 @@ class SetCriterion(nn.Module):
             pass
         return mask
 
-    def get_loss(self, loss, outputs, targets, indices, num_groups, **kwargs):
-    # def get_loss(self, loss, outputs, targets, **kwargs):
+    # def get_loss(self, loss, outputs, targets, indices, num_groups, **kwargs):
+    def get_loss(self, loss, outputs, targets, **kwargs):
         loss_map = {
             'activity': self.loss_activity_labels,
             'action': self.loss_action_labels,
@@ -301,8 +316,8 @@ class SetCriterion(nn.Module):
             'consistency': self.loss_action_group_consistency,
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
-        return loss_map[loss](outputs, targets, indices, num_groups, **kwargs)
-        # return loss_map[loss](outputs, targets, **kwargs)
+        # return loss_map[loss](outputs, targets, indices, num_groups, **kwargs)
+        return loss_map[loss](outputs, targets, **kwargs)
 
     def forward(self, outputs, targets):
         """ This performs the loss computation.
@@ -317,22 +332,22 @@ class SetCriterion(nn.Module):
         """
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs' and k != 'pred_action_logits'}
 
-        # ****************
-        # Retrieve the matching between the outputs of the last layer and the targets
-        indices = self.matcher(outputs_without_aux, targets[1:])
-        # Compute the average number of target groups accross all nodes, for normalization purposes
-        num_groups = (targets[1].decompose()[0] != -1).sum()
-        num_groups = torch.as_tensor([num_groups], dtype=torch.float, device=next(iter(outputs.values())).device)
-        if is_dist_avail_and_initialized():
-            torch.distributed.all_reduce(num_groups)
-        num_groups = torch.clamp(num_groups / get_world_size(), min=1).item()  # every gpu has at least on positive sample
-        # **************
+        # # ****************
+        # # Retrieve the matching between the outputs of the last layer and the targets
+        # indices = self.matcher(outputs_without_aux, targets[1:])
+        # # Compute the average number of target groups accross all nodes, for normalization purposes
+        # num_groups = (targets[1].decompose()[0] != -1).sum()
+        # num_groups = torch.as_tensor([num_groups], dtype=torch.float, device=next(iter(outputs.values())).device)
+        # if is_dist_avail_and_initialized():
+        #     torch.distributed.all_reduce(num_groups)
+        # num_groups = torch.clamp(num_groups / get_world_size(), min=1).item()  # every gpu has at least on positive sample
+        # # **************
 
         # Compute all the requested losses
         losses = {}
         for loss in self.losses:
-            losses.update(self.get_loss(loss, outputs, targets, indices, num_groups))
-            # losses.update(self.get_loss(loss, outputs, targets))
+            # losses.update(self.get_loss(loss, outputs, targets, indices, num_groups))
+            losses.update(self.get_loss(loss, outputs, targets))
 
         # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
         # if 'aux_outputs' in outputs:

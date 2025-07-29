@@ -85,6 +85,7 @@ class BackboneI3D(nn.Module):
         boxes_features = boxes_features.reshape(N, -1)
         boxes_features = self.bbox_fc(boxes_features)
 
+        # if not global features:
         boxes_features = boxes_features.reshape(-1, T, self.hidden_dim)
 
         # add global features
