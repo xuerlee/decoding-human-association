@@ -440,11 +440,24 @@ class InceptionI3d_noglobal(nn.Module):  #  output mixed_4b / mixed_3c features 
         'Predictions',
     )
     INVALID=(
+        'Conv3d_1a_7x7',
+        'MaxPool3d_2a_3x3',
+        'Conv3d_2b_1x1',
+        'Conv3d_2c_3x3',
+        'MaxPool3d_3a_3x3',
+        'Mixed_3b',
+        'Mixed_3c',
+        'MaxPool3d_4a_3x3',
+        'Mixed_4b',
+        'Mixed_4c',
+        'Mixed_4d',
+        'Mixed_4e',
+        'Mixed_4f',
         'MaxPool3d_5a_2x2',
         'Mixed_5b',
         'Mixed_5c',
-        #'Logits',
-        #'Predictions'
+        # 'Logits',
+        # 'Predictions'
     )
 
     def __init__(self, num_classes=400, spatial_squeeze=True,
@@ -601,7 +614,7 @@ class InceptionI3d_noglobal(nn.Module):  #  output mixed_4b / mixed_3c features 
     def forward(self, x):
 
         for end_point in self.VALID_ENDPOINTS:  # including prediction and logits
-            if end_point == 'MaxPool3d_5a_2x2':  # can output features from other layers
+            if end_point == 'MaxPool3d_4a_3x3':  # can output features from other layers
                 break
             # if end_point == 'MaxPool3d_4a_3x3':
             #    break
@@ -622,14 +635,14 @@ class InceptionI3d_noglobal(nn.Module):  #  output mixed_4b / mixed_3c features 
         return self.avg_pool(x)
 
 class i3d_noglobal(nn.Module):
-    def __init__(self, in_channel=832, out_channel=256):
+    def __init__(self, in_channel=480, out_channel=256):
         # mixed_4f: 832; mixed_3c: 480; mixed_4b: 512; mixed_5c: 1024
         super(i3d_noglobal, self).__init__()
         self.in_channel = in_channel
         self.out_channel = out_channel
         self.i3d = InceptionI3d_noglobal()  # T / 2 → 10 → 5;  H / 16, W / 16 → 224 → 14
 
-        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (8, 1, 1),
+        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1),
                                         stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
         # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))

@@ -141,6 +141,9 @@ def main(args):
         model_without_ddp = model.module
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(name)
 
     param_dicts = {"params": [p for n, p in model_without_ddp.named_parameters() if p.requires_grad]},
 

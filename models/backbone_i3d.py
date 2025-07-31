@@ -31,7 +31,7 @@ class BackboneI3D(nn.Module):
         # self.i3d = i3d(out_channel=hidden_dim)
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1.0, sampling_ratio=-1)
         self.bbox_fc = nn.Sequential(nn.Linear(hidden_dim*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
-        self.input_proj = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
+        # self.input_proj = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
 
     def forward(self, img, bbox, valid_areas_b, meta):
         B, T, C, H, W = img.shape
