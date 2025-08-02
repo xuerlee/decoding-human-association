@@ -47,12 +47,13 @@ class BackboneI3D(nn.Module):
         n_per_frame = []
         for i, bbox_b in enumerate(bbox_copy):
             rois = bbox_b[valid_areas_b[i][0]: valid_areas_b[i][1], valid_areas_b[i][2]: valid_areas_b[i][3]]
-            OH = meta[0]['frame_size'][0]
-            OW = meta[0]['frame_size'][1]
-            H_ratio = FH / OH
-            W_ratio = FW / OW
-            rois[:, [0, 2]] *= W_ratio
-            rois[:, [1, 3]] *= H_ratio  # : represents selecting all rows
+            # since Transforms, no need to reshape bboxes here:
+            # OH = meta[0]['frame_size'][0]
+            # OW = meta[0]['frame_size'][1]
+            # H_ratio = FH / OH
+            # W_ratio = FW / OW
+            # rois[:, [0, 2]] *= W_ratio
+            # rois[:, [1, 3]] *= H_ratio  # : represents selecting all rows
             n = rois.shape[0]
             n_per_frame.append(n)
             if n > n_max:

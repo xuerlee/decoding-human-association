@@ -8,7 +8,6 @@ from torch.utils import data
 import torchvision.models as models
 import cv2
 from PIL import Image
-from torchvision import transforms
 
 import matplotlib.pyplot as plt
 import random
@@ -120,7 +119,7 @@ def collective_all_frames(anns):
 
 
 class Collective_Dataset(data.Dataset):
-    def __init__(self, anns, frames, img_path, img_w, img_h, num_frames=10, is_training=True):
+    def __init__(self, anns, frames, img_path, transform, num_frames=10, is_training=True):
         """
         Args:
             Characterize collective dataset based on feature maps.
@@ -128,17 +127,11 @@ class Collective_Dataset(data.Dataset):
         self.anns = anns
         self.frames = frames
         self.img_path = img_path
-        self.img_w = img_w
-        self.img_h = img_h
 
         self.num_frames = num_frames  # number of stacked frame features
         self.is_training = is_training
 
-        self.transform = transforms.Compose([
-        transforms.Resize((self.img_h, self.img_w)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ])
+        self.transform = transform
 
     def __len__(self):
         return len(self.frames)  # number of frames with anns (filtered the first and thea last ones)
@@ -210,23 +203,25 @@ class Collective_Dataset(data.Dataset):
                 one_hot_matrix[person_to_index[person], group] = 1
 
         imgs = []
+        bbox = bboxes.copy()
+        bbox = np.array(bbox, dtype=np.float64).reshape(-1, 4)
         for i, (sid, src_fid, fid) in enumerate(select_frames[2]):  # 10 frames for 1 item
             img = cv2.imread(self.img_path + '/seq%02d/frame%04d.jpg' % (sid, fid))[:, :, [2, 1, 0]]  # BGR -> RGB  # H, W, 3
             img = Image.fromarray(img)
-            img = self.transform(img)
+            img, new_bboxes = self.transform(img, bbox)
             imgs.append(img)
 
         # labels for the whole video clip (the label of the key frame)
         meta = {}
         imgs = np.stack(imgs)
-        bboxes = np.array(bboxes, dtype=np.float64).reshape(-1, 4)
+        # bboxes = np.array(bboxes, dtype=np.float64).reshape(-1, 4)
         actions = np.array(actions, dtype=np.int32)
         activities = np.array(activities, dtype=np.int32)
         one_hot_matrix = np.array(one_hot_matrix, dtype=np.int32)
 
         imgs = torch.from_numpy(imgs).float()
         imgs = torch.squeeze(imgs, 1)  # shape: (10, 3, H, W)
-        bboxes = torch.from_numpy(bboxes).float()
+        bboxes = torch.from_numpy(new_bboxes).float()
         actions = torch.from_numpy(actions).long()
         activities = torch.from_numpy(activities).long()
         one_hot_matrix = torch.from_numpy(one_hot_matrix).int()

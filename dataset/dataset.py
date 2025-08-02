@@ -4,6 +4,8 @@ import torch
 import torch.utils.data as data
 import torchvision
 
+import util.transforms as visiontransforms
+
 from .collective import collective_path, collective_read_dataset, collective_all_frames, Collective_Dataset
 
 def build(args):
@@ -22,9 +24,23 @@ def build(args):
         test_anns = collective_read_dataset(test_ann_file)
         test_frames = collective_all_frames(test_anns)
 
-        train_dataset = Collective_Dataset(train_anns, train_frames, args.img_path, args.img_w, args.img_h,
+        train_transform = visiontransforms.Compose([
+        visiontransforms.Resize((args.img_w, args.img_h)),
+        visiontransforms.RandomHorizontalFlip(),
+        visiontransforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+        visiontransforms.ToTensor(),
+        visiontransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+
+        test_transform = visiontransforms.Compose([
+        visiontransforms.Resize((args.img_w, args.img_h)),
+        visiontransforms.ToTensor(),
+        visiontransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+
+        train_dataset = Collective_Dataset(train_anns, train_frames, args.img_path, train_transform,
                                           num_frames=args.num_frames, is_training=args.is_training)
-        test_dataset = Collective_Dataset(test_anns, test_frames, args.img_path, args.img_w, args.img_h,
+        test_dataset = Collective_Dataset(test_anns, test_frames, args.img_path, test_transform,
                                          num_frames=args.num_frames, is_training=args.is_training)
 
     else:
