@@ -27,7 +27,7 @@ def build(args):
         train_transform = visiontransforms.Compose([
         visiontransforms.Resize((args.img_w, args.img_h)),
         visiontransforms.RandomHorizontalFlip(),
-        # visiontransforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+        visiontransforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
         visiontransforms.ToTensor(),
         visiontransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
