@@ -37,7 +37,7 @@ class DETR(nn.Module):
         # self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         # self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
         # self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
-        self.dropout = nn.Dropout(p=0.5)  # set zeros randomly, no influences on valid mask
+        self.dropout = nn.Dropout(p=0.3)  # set zeros randomly, no influences on valid mask
         self.backbone = backbone
         self.aux_loss = aux_loss
 
@@ -203,7 +203,7 @@ class SetCriterion(nn.Module):
         tgt_action_ids = tgt_action_ids[idx]  # n_persons in B
         src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
 
-        loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.1)
+        loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
         losses = {'loss_action': loss_ce}
 
         if log:
