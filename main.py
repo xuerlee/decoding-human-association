@@ -33,9 +33,9 @@ def get_args_parser():
                         help='gradient clipping max norm')
 
     # * Transformer
-    parser.add_argument('--enc_layers', default=0, type=int,
+    parser.add_argument('--enc_layers', default=2, type=int,
                         help="Number of encoding layers in the transformer")
-    parser.add_argument('--dec_layers', default=6, type=int,
+    parser.add_argument('--dec_layers', default=1, type=int,
                         help="Number of decoding layers in the transformer")
     parser.add_argument('--dim_feedforward', default=2048, type=int,
                         help="Intermediate size of the feedforward layers in the transformer blocks")
@@ -85,7 +85,7 @@ def get_args_parser():
                         help='width of resized images')
     parser.add_argument('--img_h', default=480, type=int,
                         help='heigh of resized images')
-    parser.add_argument('--num_frames', default=6, type=int,
+    parser.add_argument('--num_frames', default=3, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
                         help='number of feature channels output by the feature extraction part')
