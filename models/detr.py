@@ -37,7 +37,7 @@ class DETR(nn.Module):
         # self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         # self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
         # self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
-        self.dropout = nn.Dropout(p=0.3)  # set zeros randomly, no influences on valid mask
+        self.dropout = nn.Dropout(p=0.1)  # set zeros randomly, no influences on valid mask
         self.backbone = backbone
         self.aux_loss = aux_loss
 

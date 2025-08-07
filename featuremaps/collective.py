@@ -148,11 +148,21 @@ class Collective_FeatureMapDataset(data.Dataset):
         sid, src_fid = frame
 
         if self.is_training:
-            return sid, src_fid, [(sid, src_fid, fid) for fid in range(src_fid - int(self.num_frames / 2), src_fid + int(self.num_frames / 2))]
-            # normal training: each training loading 10 frames
+            half_left = self.num_frames // 2
+            half_right = self.num_frames - half_left
+
+            fids = range(src_fid - half_left,
+                         src_fid + half_right)
+
+            return sid, src_fid, [(sid, src_fid, fid) for fid in fids]            # normal training: each training loading 10 frames
         else:
-            return sid, src_fid, [(sid, src_fid, fid) for fid in range(src_fid - int(self.num_frames / 2), src_fid + int(self.num_frames / 2))]
-            # normal testing: each test loading 10 frames
+            half_left = self.num_frames // 2
+            half_right = self.num_frames - half_left
+
+            fids = range(src_fid - half_left,
+                         src_fid + half_right)
+
+            return sid, src_fid, [(sid, src_fid, fid) for fid in fids]            # normal testing: each test loading 10 frames
 
     def load_samples_sequence(self, select_frames):
     #     if torch.cuda.is_available():

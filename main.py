@@ -27,8 +27,8 @@ def get_args_parser():
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
-    parser.add_argument('--epochs', default=300, type=int)
-    parser.add_argument('--lr_drop', default=200, type=int)
+    parser.add_argument('--epochs', default=150, type=int)
+    parser.add_argument('--lr_drop', default=(50, 100), type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
 
@@ -81,11 +81,11 @@ def get_args_parser():
                         default='/home/jiqqi/data/social_CAD/anns', type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
-    parser.add_argument('--img_w', default=224, type=int,
+    parser.add_argument('--img_w', default=720, type=int,
                         help='width of resized images')
-    parser.add_argument('--img_h', default=224, type=int,
+    parser.add_argument('--img_h', default=480, type=int,
                         help='heigh of resized images')
-    parser.add_argument('--num_frames', default=10, type=int,
+    parser.add_argument('--num_frames', default=3, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
                         help='number of feature channels output by the feature extraction part')

@@ -448,12 +448,12 @@ class InceptionI3d_noglobal(nn.Module):  #  output mixed_4b / mixed_3c features 
         # 'Mixed_3b',
         # 'Mixed_3c',
         # 'MaxPool3d_4a_3x3',
-        'Mixed_4b',
-        'Mixed_4c',
-        'Mixed_4d',
-        'Mixed_4e',
-        'Mixed_4f',
-        'MaxPool3d_5a_2x2',
+        # 'Mixed_4b',
+        # 'Mixed_4c',
+        # 'Mixed_4d',
+        # 'Mixed_4e',
+        # 'Mixed_4f',
+        # 'MaxPool3d_5a_2x2',
         'Mixed_5b',
         'Mixed_5c',
         # 'Logits',
@@ -614,7 +614,7 @@ class InceptionI3d_noglobal(nn.Module):  #  output mixed_4b / mixed_3c features 
     def forward(self, x):
 
         for end_point in self.VALID_ENDPOINTS:  # including prediction and logits
-            if end_point == 'MaxPool3d_4a_3x3':  # can output features from other layers
+            if end_point == 'MaxPool3d_5a_2x2':  # can output features from other layers
                 break
             # if end_point == 'MaxPool3d_4a_3x3':
             #    break
@@ -635,7 +635,7 @@ class InceptionI3d_noglobal(nn.Module):  #  output mixed_4b / mixed_3c features 
         return self.avg_pool(x)
 
 class i3d_noglobal(nn.Module):
-    def __init__(self, in_channel=480, out_channel=256):
+    def __init__(self, in_channel=832, out_channel=256):
         # mixed_4f: 832; mixed_3c: 480; mixed_4b: 512; mixed_5c: 1024
         super(i3d_noglobal, self).__init__()
         self.in_channel = in_channel
