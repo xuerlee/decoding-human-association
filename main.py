@@ -85,7 +85,7 @@ def get_args_parser():
                         help='width of resized images')
     parser.add_argument('--img_h', default=480, type=int,
                         help='heigh of resized images')
-    parser.add_argument('--num_frames', default=3, type=int,
+    parser.add_argument('--num_frames', default=6, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
                         help='number of feature channels output by the feature extraction part')

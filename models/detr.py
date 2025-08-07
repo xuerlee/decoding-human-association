@@ -31,7 +31,7 @@ class DETR(nn.Module):
         """
         super().__init__()
         self.num_queries = num_queries
-        # self.transformer = transformer
+        self.transformer = transformer
         self.hidden_dim = transformer.d_model
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         # self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
@@ -62,38 +62,38 @@ class DETR(nn.Module):
         src_b, mask_b = bboxes.decompose()  # B, n_max, 4
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
         boxes_features, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B*T, n_max
-        # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
+        hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
         # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
 
         # without Transformer (for debug)
-        B = src_f.shape[0]
-        T = src_f.shape[1]
-        n_max = src_b.shape[1]
-        boxes_features = boxes_features.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
-        boxes_features = self.dropout(boxes_features)
-        mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
-        outputs_action_class = self.action_class_embed(boxes_features)  # B, n_max, T, num_action_classes
-        outputs_action_class = self.dropout(outputs_action_class)
-        outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
-        valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max
-        action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
-        out = {'pred_action_logits': action_scores}
-
-
-        # # *****************
-        # # individual action classfication
         # B = src_f.shape[0]
         # T = src_f.shape[1]
         # n_max = src_b.shape[1]
-        # memory = memory.view(B, T, n_max, self.hidden_dim).permute(0, 2, 1, 3)  # B, n_max, T, hidden_dim
-        # # memory = memory.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
+        # boxes_features = boxes_features.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
+        # boxes_features = self.dropout(boxes_features)
         # mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
-        # # mask = ~mask.view(n_max, B, T).permute(1, 0, 2)  # B, n_max, T
-        # outputs_action_class = self.action_class_embed(memory)  # B, n_max, T, num_action_classes
+        # outputs_action_class = self.action_class_embed(boxes_features)  # B, n_max, T, num_action_classes
+        # outputs_action_class = self.dropout(outputs_action_class)
         # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         # valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max
         # action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
-        #
+        # out = {'pred_action_logits': action_scores}
+
+
+        # # *****************
+        # individual action classfication
+        B = src_f.shape[0]
+        T = src_f.shape[1]
+        n_max = src_b.shape[1]
+        memory = memory.view(B, T, n_max, self.hidden_dim).permute(0, 2, 1, 3)  # B, n_max, T, hidden_dim
+        # memory = memory.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
+        mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
+        # mask = ~mask.view(n_max, B, T).permute(1, 0, 2)  # B, n_max, T
+        outputs_action_class = self.action_class_embed(memory)  # B, n_max, T, num_action_classes
+        outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max
+        action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
+
         # # group activity classification
         # hs = hs.view(-1, B, T, self.num_queries, self.hidden_dim).permute(0, 1, 3, 2, 4)
         # # hs = hs.view(-1, n_max, self.num_queries, self.hidden_dim)
@@ -115,6 +115,9 @@ class DETR(nn.Module):
         # if self.aux_loss:
         #     out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
         # # *******************
+
+        out = {'pred_action_logits': action_scores}
+
         return out
 
     @torch.jit.unused
