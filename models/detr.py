@@ -203,7 +203,8 @@ class SetCriterion(nn.Module):
         tgt_action_ids = tgt_action_ids[idx]  # n_persons in B
         src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
 
-        loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
+        # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
+        loss_ce = F.cross_entropy(src_logits, tgt_action_ids)
         losses = {'loss_action': loss_ce}
 
         if log:
