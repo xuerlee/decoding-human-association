@@ -25,7 +25,7 @@ def build(args):
         test_frames = collective_all_frames(test_anns)
 
         train_transform = visiontransforms.Compose([
-        visiontransforms.Resize((args.img_w, args.img_h)),
+        visiontransforms.Resize((args.img_h, args.img_w)),
         # visiontransforms.RandomHorizontalFlip(),
         # visiontransforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
         visiontransforms.ToTensor(),
@@ -33,7 +33,7 @@ def build(args):
         ])
 
         test_transform = visiontransforms.Compose([
-        visiontransforms.Resize((args.img_w, args.img_h)),
+        visiontransforms.Resize((args.img_h, args.img_w)),
         visiontransforms.ToTensor(),
         visiontransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])

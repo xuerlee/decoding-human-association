@@ -183,7 +183,7 @@ class Resize(object):
 
     def __init__(self, size, interpolation=Image.BILINEAR):
         assert isinstance(size, int) or (isinstance(size, Iterable) and len(size) == 2)
-        self.size = size
+        self.size = size  # h, w
         self.interpolation = interpolation
 
     def __call__(self, img,bbox):
@@ -195,12 +195,12 @@ class Resize(object):
             PIL Image: Rescaled image.
         """
         w, h = img.size
-        bbox[:, 0] = self.size[0] * 1.0 / w * bbox[:, 0]
-        bbox[:, 1] = self.size[1] * 1.0 / h * bbox[:, 1]
-        bbox[:, 2] = self.size[0] * 1.0 / w * bbox[:, 2]
-        bbox[:, 3] = self.size[1] * 1.0 / h * bbox[:, 3]
+        bbox[:, 0] = self.size[1] * 1.0 / w * bbox[:, 0]
+        bbox[:, 1] = self.size[0] * 1.0 / h * bbox[:, 1]
+        bbox[:, 2] = self.size[1] * 1.0 / w * bbox[:, 2]
+        bbox[:, 3] = self.size[0] * 1.0 / h * bbox[:, 3]
 
-        return F.resize(img, self.size, self.interpolation),bbox
+        return F.resize(img, self.size, self.interpolation),bbox  # torchvision resize: h, w
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
