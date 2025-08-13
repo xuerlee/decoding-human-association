@@ -45,6 +45,7 @@ class BackboneI3D(nn.Module):
         bbox_copy = bbox.clone()
         n_max = 0  # the max number of persons in one frame in one batch
         n_per_frame = []
+        # print(bbox_copy, valid_areas_b)
         for i, bbox_b in enumerate(bbox_copy):
             rois = bbox_b[valid_areas_b[i][0]: valid_areas_b[i][1], valid_areas_b[i][2]: valid_areas_b[i][3]]
             # the bboxes has been scaled once in Transforms
@@ -57,7 +58,7 @@ class BackboneI3D(nn.Module):
             n = rois.shape[0]
             n_per_frame.append(n)
             if n > n_max:
-                n_max = n
+                n_max = n  # n_max in one batch
             rois = rois.repeat_interleave(T, dim=0)
             frame_id = (i * T) + torch.arange(0, T).repeat(n).reshape(-1, 1).to(rois.device)
             rois = torch.cat([frame_id, rois], dim=1)
@@ -88,7 +89,6 @@ class BackboneI3D(nn.Module):
 
         # if not global features:
         boxes_features = boxes_features.reshape(-1, T, self.hidden_dim)  # since grouped bboxes by individuals instead of frames
-
         # add global features
         # global_features = global_fm.mean(dim=[2, 3])
         # boxes_features = torch.cat((boxes_features, global_features), dim=0).reshape(-1, T, self.hidden_dim)  # N(with T)+, T， hidden_dim(256)  calculate mean along T axis for the transformer output
@@ -105,6 +105,7 @@ class BackboneI3D(nn.Module):
         # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim)
         mask = mask.reshape(B*T, n_max)  # n_max, B*T, hidden_dim, find connections between individuals per frame
         # mask = mask.reshape(B*T, n_max).permute(1, 0)
+        # print(mask)
         return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame, (FH, FW)
 
 class Joiner(nn.Sequential):
