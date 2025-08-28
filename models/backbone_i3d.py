@@ -177,18 +177,18 @@ class BackboneI3D(nn.Module):
             frame_id = (i * T) + torch.arange(0, T).repeat(n).reshape(-1, 1).to(rois.device)
             rois = torch.cat([frame_id, rois], dim=1)
             all_rois.append(rois)
-        # viz_i3d_feature_and_rois(
-        #     meta[0],
-        #     action_fm,
-        #     all_rois,
-        #     B=B, T=T,  # test when B = 1
-        #     H=H, W=W,
-        #     sample_idx=0,
-        #     frame_idx=0,
-        #     persons="all",
-        #     coords="feature",
-        #     channel="mean",
-        # )
+        viz_i3d_feature_and_rois(
+            meta[0],
+            action_fm,
+            all_rois,
+            B=B, T=T,  # test when B = 1
+            H=H, W=W,
+            sample_idx=0,
+            frame_idx=0,
+            persons="all",
+            coords="feature",
+            channel="mean",
+        )
 
         roi_boxes = torch.cat([b for i, b in enumerate(all_rois)], dim=0)  # N(all batch), 5  grouping boxes by individuals instead of frames
         # roi align
