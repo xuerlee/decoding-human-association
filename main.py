@@ -25,7 +25,7 @@ from models import build_model
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
     parser.add_argument('--lr', default=1e-4, type=float)
-    parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=150, type=int)
     parser.add_argument('--lr_drop', default=[50, 100], type=int)
@@ -81,9 +81,9 @@ def get_args_parser():
                         default='/home/jiqqi/data/social_CAD/anns', type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
-    parser.add_argument('--img_w', default=720, type=int,
+    parser.add_argument('--img_w', default=224, type=int,
                         help='width of resized images')
-    parser.add_argument('--img_h', default=480, type=int,
+    parser.add_argument('--img_h', default=224, type=int,
                         help='heigh of resized images')
     parser.add_argument('--num_frames', default=3, type=int,
                         help='number of stacked frame features')

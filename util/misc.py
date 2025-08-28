@@ -360,8 +360,11 @@ def nested_tensor_from_fm_list(tensor_list: List[Tensor]):
         tensor = torch.zeros(batch_shape, dtype=dtype, device=device)
         mask = torch.ones((b, h, w), dtype=torch.bool, device=device)
         for fm, pad_fm, m in zip(tensor_list, tensor, mask):
+            # fm.shape: nf, c, h, w
             pad_fm[: fm.shape[0], : fm.shape[1], : fm.shape[2], : fm.shape[3]].copy_(fm)
             m[: fm.shape[2], :fm.shape[3]] = False  # 0：fm.shape
+        # if mask on nf axis is needed, broadcast as follows:
+        # m = mask.unsqueeze(1).expand(b, nf, h, w)
     else:
         raise ValueError('not supported')
     return NestedTensor(tensor, mask)

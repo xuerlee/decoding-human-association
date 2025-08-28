@@ -195,11 +195,15 @@ class Resize(object):
             PIL Image: Rescaled image.
         """
         w, h = img.size
-        bbox[:, 0] = self.size[1] * 1.0 / w * bbox[:, 0]
-        bbox[:, 1] = self.size[0] * 1.0 / h * bbox[:, 1]
-        bbox[:, 2] = self.size[1] * 1.0 / w * bbox[:, 2]
-        bbox[:, 3] = self.size[0] * 1.0 / h * bbox[:, 3]
 
+        # H_ratio = self.size[0] / h
+        # W_ratio = self.size[1] / w
+        # bbox[:, [0, 2]] *= W_ratio
+        # bbox[:, [1, 3]] *= H_ratio
+        # bbox[:, 0] = self.size[1] * 1.0 / w * bbox[:, 0]
+        # bbox[:, 1] = self.size[0] * 1.0 / h * bbox[:, 1]
+        # bbox[:, 2] = self.size[1] * 1.0 / w * bbox[:, 2]
+        # bbox[:, 3] = self.size[0] * 1.0 / h * bbox[:, 3]
         return F.resize(img, self.size, self.interpolation),bbox  # torchvision resize: h, w
 
     def __repr__(self):
@@ -521,11 +525,12 @@ class RandomHorizontalFlip(object):
         """
         if random.random() < self.p:
             w, h = img.size
-            bbox[:, 0] =  w - 1 - bbox[:, 0]   
-            bbox[:, 2] =  w - 1 - bbox[:, 2]  
-            bbox[:, 0] =  bbox[:, 0] + bbox[:, 2] 
-            bbox[:, 2] =  bbox[:, 0] - bbox[:, 2] 
-            bbox[:, 0] =  bbox[:, 0] - bbox[:, 2] 
+            # bbox[:, 0] =  w - 1 - bbox[:, 0]
+            # bbox[:, 2] =  w - 1 - bbox[:, 2]
+            # bbox[:, 0] =  bbox[:, 0] + bbox[:, 2]
+            # bbox[:, 2] =  bbox[:, 0] - bbox[:, 2]
+            # bbox[:, 0] =  bbox[:, 0] - bbox[:, 2]
+            bbox[:, [0, 2]] = w - bbox[:, [2, 0]]
             return F.hflip(img),bbox
         return img,bbox
 
