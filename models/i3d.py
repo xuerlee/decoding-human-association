@@ -642,7 +642,7 @@ class i3d_noglobal(nn.Module):
         self.out_channel = out_channel
         self.i3d = InceptionI3d_noglobal()  # T / 2 → 10 → 5;  H / 16, W / 16 → 224 → 14
 
-        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (1, 1, 1),
+        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (3, 1, 1),
                                         stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
         # self.conv1 = nn.Conv3d(self.in_channel, self.out_channel, kernel_size=1,
         #                                 stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
