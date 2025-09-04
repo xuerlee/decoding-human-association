@@ -77,7 +77,8 @@ class DETR(nn.Module):
         # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         # valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max -> result: T or 1
         valid_counts = T
-        action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
+        # action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
+        action_scores = outputs_action_class.sum(dim=2) / valid_counts  # B, n_max, num_action_classes  # average score for each person along T dimension
         out = {'pred_action_logits': action_scores}
 
 
