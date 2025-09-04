@@ -74,8 +74,7 @@ class DETR(nn.Module):
         mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
         outputs_action_class = self.action_class_embed(boxes_features)  # B, n_max, T, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
-        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
-        outputs_action_class = outputs_action_class.masked_fill(~mask.unsqueeze(-1), float("-inf"))
+        outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max
         action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
         out = {'pred_action_logits': action_scores}
@@ -204,11 +203,9 @@ class SetCriterion(nn.Module):
         assert 'pred_action_logits' in outputs
         src_logits = outputs['pred_action_logits']  # [B, n_max, num_action_classes]
         tgt_action_ids, mask_ids = targets[0].decompose()  # B, n_max
-
         idx = torch.where(tgt_action_ids != -1)
         tgt_action_ids = tgt_action_ids[idx]  # n_persons in B
         src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
-
         # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
         loss_ce = F.cross_entropy(src_logits, tgt_action_ids)
         losses = {'loss_action': loss_ce}

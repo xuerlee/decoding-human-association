@@ -272,7 +272,9 @@ def get_sha():
 
 def collate_fn(batch):
     featuremaps, bboxes, actions, activities, one_hot_matrix, meta = list(zip(*batch))  # featuremap: tuple?
-    featuremaps = nested_tensor_from_fm_list(featuremaps)
+    featuremaps = torch.stack(featuremaps)
+    # featuremaps = nested_tensor_from_fm_list(featuremaps)
+
 
     bboxes = nested_tensor_from_tensor_list(bboxes)
 
