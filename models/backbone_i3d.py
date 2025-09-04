@@ -140,7 +140,8 @@ class BackboneI3D(nn.Module):
         super().__init__()
         self.crop_h = crop_h
         self.crop_w = crop_w
-        self.hidden_dim = hidden_dim * crop_h * crop_w
+        # self.hidden_dim = hidden_dim
+        self.hidden_dim = 256*7*7
         self.i3d = i3d_noglobal(out_channel=hidden_dim)
         # self.i3d = i3d(out_channel=hidden_dim)
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1.0, sampling_ratio=-1)
@@ -225,16 +226,19 @@ class BackboneI3D(nn.Module):
         start = 0
         # boxes_features_padding = torch.zeros((B*n_max, T, self.hidden_dim), device=boxes_features.device)
         boxes_features_padding = torch.zeros((B*n_max, T, self.hidden_dim), device=boxes_features.device)
-        mask = torch.ones((B, T, n_max), dtype=torch.bool, device=boxes_features.device)
+        # mask = torch.ones((B, T, n_max), dtype=torch.bool, device=boxes_features.device)
+        mask = torch.ones((B, n_max), dtype=torch.bool, device=boxes_features.device)
         for i, n in enumerate(n_per_frame):
             boxes_features_padding[i*n_max: i*n_max+n, :, :].copy_(boxes_features[start: start+n, :, :])
-            mask[i, :, :n] = False
+            # mask[i, :, :n] = False
+            mask[i, :n] = False
             start += n
-        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim).permute(1, 0, 2)
+        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).mean(dim=(2))  # avg pooling on T dimension -> B, n_max, hidden_dim
+        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).contiguous().reshape(B*T, n_max, self.hidden_dim).permute(1, 0, 2).contiguous()
         # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim)
-        mask = mask.reshape(B*T, n_max)  # n_max, B*T, hidden_dim, find connections between individuals per frame
+        mask = mask.reshape(B, n_max)  # removed T dimension
+        # mask = mask.reshape(B*T, n_max)  # n_max, B*T, hidden_dim, find connections between individuals per frame
         # mask = mask.reshape(B*T, n_max).permute(1, 0)
-        # print(mask)
         return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame, (FH, FW)
 
 class Joiner(nn.Sequential):

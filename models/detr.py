@@ -70,16 +70,18 @@ class DETR(nn.Module):
         B = src_f.shape[0]
         T = src_f.shape[1]
         n_max = src_b.shape[1]
-        boxes_features = boxes_features.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3)  # B, n_max, T, hidden_dim
+        # boxes_features = boxes_features.view(n_max, B, T, self.hidden_dim).permute(1, 0, 2, 3).contiguous()  # B, n_max, T, hidden_dim
         boxes_features = self.dropout(boxes_features)
-        mask = ~mask.view(B, T, n_max).permute(0, 2, 1)  # B, n_max, T
-        outputs_action_class = self.action_class_embed(boxes_features)  # B, n_max, T, num_action_classes
+        # mask = ~mask.view(B, T, n_max).permute(0, 2, 1).contiguous()  # B, n_max, T
+        mask = ~mask.view(B, n_max)  # B, n_max
+        outputs_action_class = self.action_class_embed(boxes_features)  # B, n_max, T, num_action_classes  or B, n_max, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
         outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         # valid_counts = mask.sum(dim=2).clamp(min=1)  # count of each T dimension without padding:  B, n_max -> result: T or 1
-        valid_counts = T
+        # valid_counts = T
         # action_scores = outputs_action_class.sum(dim=2) / valid_counts.unsqueeze(-1)  # B, n_max, num_action_classes  # average score for each person along T dimension
-        action_scores = outputs_action_class.sum(dim=2) / valid_counts  # B, n_max, num_action_classes  # average score for each person along T dimension
+        # action_scores = outputs_action_class.sum(dim=2) / valid_counts  # B, n_max, num_action_classes  # average score for each person along T dimension
+        action_scores = outputs_action_class
         out = {'pred_action_logits': action_scores}
 
 

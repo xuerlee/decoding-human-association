@@ -642,8 +642,11 @@ class i3d_noglobal(nn.Module):
         self.out_channel = out_channel
         self.i3d = InceptionI3d_noglobal()  # T / 2 → 10 → 5;  H / 16, W / 16 → 224 → 14
 
-        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1),
+        # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (1, 1, 1),
+        #                                 stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
+        self.conv1 = nn.Conv3d(self.in_channel, self.out_channel, kernel_size=1,
                                         stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
+        self.reduce = nn.Linear(self.in_channel, self.out_channel)
         # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))
         # self.conv2=nn.ConvTranspose3d(1024, self.out_channel, (9, 1, 1), stride=(1, 1, 1))
@@ -652,12 +655,21 @@ class i3d_noglobal(nn.Module):
             'models/pretrained_models/rgb_imagenet.pt'))
         # self.i3d.replace_logits(8)
 
+    # def forward(self, x):  # B, T, C, H, W = x.shape
+    #     x = x.permute(0, 2, 1, 3, 4)
+    #     B, C, T, H, W = x.shape
+    #     x = self.i3d(x)
+    #     x = self.conv1(x)
+    #     _, C_o, _, FH, FW = x.shape  # B, C_o, T, FH, FW
+    #     x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW)  # B*T,C,H,W
+    #     return x
+
     def forward(self, x):  # B, T, C, H, W = x.shape
         x = x.permute(0, 2, 1, 3, 4)
         B, C, T, H, W = x.shape
         x = self.i3d(x)
-        x = self.conv1(x)
-        # print(x.shape)
-        _, C_o, _, FH, FW = x.shape  # B, C_o, T, FH, FW
-        x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW)  # B*T,C,H,W
+        x = x.permute(0, 2, 3, 4, 1).contiguous()  # B, T, H, W, C
+        x = self.reduce(x)
+        _, _, FH, FW, C_o = x.shape  # B, T, H, W, C
+        x = x.permute(0, 1, 4, 2, 3).contiguous().reshape(-1, C_o, FH, FW)  # B*T,C,H,W
         return x
