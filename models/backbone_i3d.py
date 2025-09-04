@@ -140,7 +140,7 @@ class BackboneI3D(nn.Module):
         super().__init__()
         self.crop_h = crop_h
         self.crop_w = crop_w
-        self.hidden_dim = hidden_dim
+        self.hidden_dim = hidden_dim * crop_h * crop_w
         self.i3d = i3d_noglobal(out_channel=hidden_dim)
         # self.i3d = i3d(out_channel=hidden_dim)
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1.0, sampling_ratio=-1)
@@ -210,17 +210,20 @@ class BackboneI3D(nn.Module):
         N = boxes_features.shape[0]  # number of inviduals (with T)
         # boxes_features = torch.cat((boxes_features, global_fm), dim=0)  # only available when global fm is from mixed_5c
         # boxes_features = boxes_features.reshape(N+B*T, -1)
-        boxes_features = boxes_features.reshape(N, -1)
-        boxes_features = self.bbox_fc(boxes_features)
-
-        # if not global features:
+        # # *******************************************
+        # boxes_features = boxes_features.reshape(N, -1)
+        # boxes_features = self.bbox_fc(boxes_features)
+        #
+        # # if not global features:
         boxes_features = boxes_features.reshape(-1, T, self.hidden_dim)  # since grouped bboxes by individuals instead of frames
+        # # ********************************************
         # add global features
         # global_features = global_fm.mean(dim=[2, 3])
         # boxes_features = torch.cat((boxes_features, global_features), dim=0).reshape(-1, T, self.hidden_dim)  # N(with T)+, T， hidden_dim(256)  calculate mean along T axis for the transformer output
 
         # padding and mask again
         start = 0
+        # boxes_features_padding = torch.zeros((B*n_max, T, self.hidden_dim), device=boxes_features.device)
         boxes_features_padding = torch.zeros((B*n_max, T, self.hidden_dim), device=boxes_features.device)
         mask = torch.ones((B, T, n_max), dtype=torch.bool, device=boxes_features.device)
         for i, n in enumerate(n_per_frame):

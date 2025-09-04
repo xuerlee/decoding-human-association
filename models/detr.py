@@ -32,7 +32,8 @@ class DETR(nn.Module):
         super().__init__()
         self.num_queries = num_queries
         # self.transformer = transformer
-        self.hidden_dim = transformer.d_model
+        # self.hidden_dim = transformer.d_model
+        self.hidden_dim = 256*7*7
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         # self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         # self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
