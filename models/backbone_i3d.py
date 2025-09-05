@@ -242,7 +242,7 @@ class BackboneI3D(nn.Module):
 
         # debug: remove mask and padding:
         boxes_features_padding = boxes_features.reshape(B, n_max, T, self.hidden_dim).mean(dim=(2))
-        mask = torch.ones((B, n_max), dtype=torch.bool, device=boxes_features.device)
+        mask = torch.zeros((B, n_max), dtype=torch.bool, device=boxes_features.device)
         return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame, (FH, FW)
 
 class Joiner(nn.Sequential):
