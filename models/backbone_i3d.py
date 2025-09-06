@@ -140,18 +140,19 @@ class BackboneI3D(nn.Module):
         super().__init__()
         self.crop_h = crop_h
         self.crop_w = crop_w
-        # self.hidden_dim = hidden_dim
-        self.hidden_dim = 256*7*7
+        self.hidden_dim = hidden_dim
+        # self.hidden_dim = 256*7*7
         self.i3d = i3d_noglobal(out_channel=hidden_dim)
         # self.i3d = i3d(out_channel=hidden_dim)
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1.0, sampling_ratio=-1)
-        self.bbox_fc = nn.Sequential(nn.Linear(hidden_dim*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
+        # self.bbox_fc = nn.Sequential(nn.Linear(hidden_dim*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
+        self.bbox_fc = nn.Sequential(nn.Linear(832*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
         # self.input_proj = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
 
     def forward(self, img, bbox, valid_areas_b, meta):
         B, T, C, H, W = img.shape
         # img.shape: 2, 10, 3, 224, 224; batch size, num_frames, C, H, W
-        action_fm = self.i3d(img)
+        action_fm = self.i3d(img).contiguous()
         # action_fm, global_fm = self.i3d(img)  # 20, 256, 14, 14  B*T,C,H,W
         _, C_o, FH, FW = action_fm.shape
 
@@ -211,13 +212,13 @@ class BackboneI3D(nn.Module):
         N = boxes_features.shape[0]  # number of inviduals (with T)
         # boxes_features = torch.cat((boxes_features, global_fm), dim=0)  # only available when global fm is from mixed_5c
         # boxes_features = boxes_features.reshape(N+B*T, -1)
-        # # *******************************************
-        # boxes_features = boxes_features.reshape(N, -1)
-        # boxes_features = self.bbox_fc(boxes_features)
-        #
-        # # if not global features:
-        boxes_features = boxes_features.reshape(-1, T, self.hidden_dim)  # since grouped bboxes by individuals instead of frames
-        # # ********************************************
+        # *******************************************
+        boxes_features = boxes_features.reshape(N, -1)
+        boxes_features = self.bbox_fc(boxes_features)
+
+        # if not global features:
+        boxes_features = boxes_features.reshape(-1, T, self.hidden_dim).contiguous()  # since grouped bboxes by individuals instead of frames
+        # ********************************************
         # add global features
         # global_features = global_fm.mean(dim=[2, 3])
         # boxes_features = torch.cat((boxes_features, global_features), dim=0).reshape(-1, T, self.hidden_dim)  # N(with T)+, T， hidden_dim(256)  calculate mean along T axis for the transformer output
@@ -233,7 +234,7 @@ class BackboneI3D(nn.Module):
             # mask[i, :, :n] = False
             mask[i, :n] = False
             start += n
-        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).mean(dim=(2))  # avg pooling on T dimension -> B, n_max, hidden_dim
+        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).contiguous().mean(dim=(2))  # avg pooling on T dimension -> B, n_max, hidden_dim
         # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).contiguous().reshape(B*T, n_max, self.hidden_dim).permute(1, 0, 2).contiguous()
         # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim)
         mask = mask.reshape(B, n_max)  # removed T dimension

@@ -12,6 +12,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 import os
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+# os.environ['PYTHONMALLOC'] = 'debug'
+# os.environ['MALLOC_CHECK_'] = '3'
+# os.environ['MALLOC_PERTURB_'] = '153'
 
 from featuremaps import build_fmset
 from dataset import build_dataset
@@ -85,7 +89,7 @@ def get_args_parser():
                         help='width of resized images')
     parser.add_argument('--img_h', default=224, type=int,
                         help='heigh of resized images')
-    parser.add_argument('--num_frames', default=5, type=int,
+    parser.add_argument('--num_frames', default=7, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
                         help='number of feature channels output by the feature extraction part')
