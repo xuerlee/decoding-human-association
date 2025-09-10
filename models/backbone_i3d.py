@@ -140,11 +140,11 @@ class BackboneI3D(nn.Module):
         super().__init__()
         self.crop_h = crop_h
         self.crop_w = crop_w
-        self.hidden_dim = hidden_dim
-        # self.hidden_dim = 256*7*7
+        # self.hidden_dim = hidden_dim
+        self.hidden_dim = 256*7*7
         self.i3d = i3d_noglobal(out_channel=hidden_dim)
         # self.i3d = i3d(out_channel=hidden_dim)
-        self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1.0, sampling_ratio=-1)
+        self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1, sampling_ratio=-1)
         self.bbox_fc = nn.Sequential(nn.Linear(hidden_dim*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
         self.input_proj = nn.Sequential(
                             nn.Conv2d(832, 256, 3, padding=1, bias=False),
@@ -159,18 +159,18 @@ class BackboneI3D(nn.Module):
                             nn.Linear(256, 256))
 
     def forward(self, img, bbox, valid_areas_b, meta):
-        B, T, C, H, W = img.shape
+        B, _, C, H, W = img.shape
         # img.shape: 2, 10, 3, 224, 224; batch size, num_frames, C, H, W
         action_fm = self.i3d(img).contiguous()
-        # action_fm, global_fm = self.i3d(img)  # 20, 256, 14, 14  B*T,C,H,W
-        _, C_o, FH, FW = action_fm.shape
+        # action_fm, global_fm = self.i3d(img)  # 20, 256, 14, 14  B*T_o,C,H,W
+        BT_o, C_o, FH, FW = action_fm.shape
+        T_o = int(BT_o / B)
 
         # remove the padded boxes before roi align
         all_rois = []
         bbox_copy = bbox.clone()
         n_max = 0  # the max number of persons in one frame in one batch
         n_per_frame = []
-        # print(bbox_copy, valid_areas_b)
         for i, bbox_b in enumerate(bbox_copy):
             rois = bbox_b[valid_areas_b[i][0]: valid_areas_b[i][1], valid_areas_b[i][2]: valid_areas_b[i][3]]
             # the bboxes has been scaled once in Transforms
@@ -184,15 +184,15 @@ class BackboneI3D(nn.Module):
             n_per_frame.append(n)
             if n > n_max:
                 n_max = n  # n_max in one batch
-            rois = rois.repeat_interleave(T, dim=0)
-            frame_id = (i * T) + torch.arange(0, T).repeat(n).reshape(-1, 1).to(rois.device)
+            rois = rois.repeat_interleave(T_o, dim=0)
+            frame_id = (i * T_o) + torch.arange(0, T_o).repeat(n).reshape(-1, 1).to(rois.device)
             rois = torch.cat([frame_id, rois], dim=1)
             all_rois.append(rois)
         # viz_i3d_feature_and_rois(
         #     meta[0],
         #     action_fm,
         #     all_rois,
-        #     B=B, T=T,  # test when B = 1
+        #     B=B, T=T_o,  # test when B = 1
         #     H=H, W=W,
         #     sample_idx=0,
         #     frame_idx=0,
@@ -209,66 +209,65 @@ class BackboneI3D(nn.Module):
         roi_boxes.requires_grad = False
 
         boxes_features = self.roi_align(action_fm,
-                                        roi_boxes)  # N (number of individuals in all batch with T frames per frame(stack together)), D(channels 256), K, K(crop size)
+                                        roi_boxes)  # N (number of individuals in all batch with T_o frames per frame(stack together)), D(channels 256), K, K(crop size)
 
         # input proj (embeddings)
         # # Conv2D
-        boxes_features = self.input_proj(boxes_features)  # n_max * T, hidden dim
+        # boxes_features = self.input_proj(boxes_features)  # n_max * T_o, hidden dim
 
         # FC (embeddings)
-        N = boxes_features.shape[0]  # number of inviduals (with T)
+        N = boxes_features.shape[0]  # number of inviduals (with T_o)
         # boxes_features = torch.cat((boxes_features, global_fm), dim=0)  # only available when global fm is from mixed_5c
-        # boxes_features = boxes_features.reshape(N+B*T, -1)
+        # boxes_features = boxes_features.reshape(N+B*T_o, -1)
         # # *******************************************
         # boxes_features = boxes_features.reshape(N, -1)
         # boxes_features = self.bbox_fc(boxes_features)
         # # if not global features:
-        boxes_features = boxes_features.reshape(-1, T, self.hidden_dim).contiguous()  # since grouped bboxes by individuals instead of frames
+        boxes_features = boxes_features.reshape(-1, T_o, self.hidden_dim).contiguous()  # since grouped bboxes by individuals instead of frames
         # # ********************************************
         # add global features
         # global_features = global_fm.mean(dim=[2, 3])
-        # boxes_features = torch.cat((boxes_features, global_features), dim=0).reshape(-1, T, self.hidden_dim)  # N(with T)+, T， hidden_dim(256)  calculate mean along T axis for the transformer output
+        # boxes_features = torch.cat((boxes_features, global_features), dim=0).reshape(-1, T_o, self.hidden_dim)  # N(with T)+, T， hidden_dim(256)  calculate mean along T axis for the transformer output
 
         # padding and mask again
         start = 0
-        # boxes_features_padding = torch.zeros((B*n_max, T, self.hidden_dim), device=boxes_features.device)
-        boxes_features_padding = torch.zeros((B*n_max, T, self.hidden_dim), device=boxes_features.device)
-        # mask = torch.ones((B, T, n_max), dtype=torch.bool, device=boxes_features.device)
+        # boxes_features_padding = torch.zeros((B*n_max, T_o, self.hidden_dim), device=boxes_features.device)
+        boxes_features_padding = torch.zeros((B*n_max, T_o, self.hidden_dim), device=boxes_features.device)
+        # mask = torch.ones((B, T_o, n_max), dtype=torch.bool, device=boxes_features.device)
         mask = torch.ones((B, n_max), dtype=torch.bool, device=boxes_features.device)
         for i, n in enumerate(n_per_frame):
             boxes_features_padding[i*n_max: i*n_max+n, :, :].copy_(boxes_features[start: start+n, :, :])
             # mask[i, :, :n] = False
             mask[i, :n] = False
             start += n
-        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).contiguous().mean(dim=(2))  # avg pooling on T dimension -> B, n_max, hidden_dim
-        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).contiguous().reshape(B*T, n_max, self.hidden_dim).permute(1, 0, 2).contiguous()
-        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim)
-        mask = mask.reshape(B, n_max)  # removed T dimension
-        # mask = mask.reshape(B*T, n_max)  # n_max, B*T, hidden_dim, find connections between individuals per frame
-        # mask = mask.reshape(B*T, n_max).permute(1, 0)
+        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).contiguous().mean(dim=(2))  # avg pooling on T dimension -> B, n_max, hidden_dim
+        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).permute(0, 2, 1, 3).contiguous().reshape(B*T, n_max, self.hidden_dim).permute(1, 0, 2).contiguous()
+        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim)
+        mask = mask.reshape(B, n_max)  # removed T_o dimension
+        # mask = mask.reshape(B*T_o, n_max)  # n_max, B*T_o, hidden_dim, find connections between individuals per frame
+        # mask = mask.reshape(B*T_o, n_max).permute(1, 0)
 
         # # debug: remove mask and padding:
-        # boxes_features_padding = boxes_features.reshape(B, n_max, T, self.hidden_dim).mean(dim=(2))
+        # boxes_features_padding = boxes_features.reshape(B, n_max, T_o, self.hidden_dim).mean(dim=(2))
         # mask = torch.zeros((B, n_max), dtype=torch.bool, device=boxes_features.device)
-        return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame, (FH, FW)
+        return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame, T_o, (FH, FW)
 
 class Joiner(nn.Sequential):
     def __init__(self, backbone, position_embedding):
         super().__init__(backbone, position_embedding)
-        self.T = position_embedding.T
 
     def forward(self, fm, bbox, valid_areas_b, meta):
         # print(meta)
-        roi_boxes, boxes_features, mask, n_max, n_per_frame, featuremap_size = self[0](fm, bbox, valid_areas_b, meta)  # backbone
+        roi_boxes, boxes_features, mask, n_max, n_per_frame, T_o, featuremap_size = self[0](fm, bbox, valid_areas_b, meta)  # backbone
 
         bbox_norm = roi_boxes.clone()
         start = 0
         for i, n in enumerate(n_per_frame):
-            bbox_norm[start*self.T: start*self.T+n*self.T, [1, 3]] /= featuremap_size[1]
-            bbox_norm[start*self.T: start*self.T+n*self.T, [2, 4]] /= featuremap_size[0]
+            bbox_norm[start*T_o: start*T_o+n*T_o, [1, 3]] /= featuremap_size[1]
+            bbox_norm[start*T_o: start*T_o+n*T_o, [2, 4]] /= featuremap_size[0]
             start += n
         bbox_norm = bbox_norm[:, 1:]
-        pos = self[1](bbox_norm, n_max, n_per_frame)
+        pos = self[1](bbox_norm, n_max, n_per_frame, T_o)
 
         return boxes_features, pos, mask
 

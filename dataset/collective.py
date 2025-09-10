@@ -68,6 +68,8 @@ def collective_read_annotations(ann_file):
             y1 = float(se_ann.split('\t')[2])
             x2 = float(se_ann.split('\t')[3])
             y2 = float(se_ann.split('\t')[4])  # absolute coord
+            if x1 < 0:
+                x1 = 0.0
             bbox = [x1, y1, x2, y2]
             action = int(se_ann.split('\t')[5]) - 1  # start by 0
             person_id = int(se_ann.split('\t')[7]) - 1

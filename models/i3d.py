@@ -659,7 +659,7 @@ class i3d_noglobal(nn.Module):
         x = x.permute(0, 2, 1, 3, 4).contiguous()
         B, C, T, H, W = x.shape
         x = self.i3d(x)
-        # x = self.conv1(x)
+        x = self.conv1(x)
         _, C_o, _, FH, FW = x.shape  # B, C_o, T, FH, FW
         x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW).contiguous() # B*T,C,H,W
         return x
