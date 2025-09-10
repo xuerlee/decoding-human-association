@@ -229,27 +229,27 @@ class BackboneI3D(nn.Module):
         # global_features = global_fm.mean(dim=[2, 3])
         # boxes_features = torch.cat((boxes_features, global_features), dim=0).reshape(-1, T_o, self.hidden_dim)  # N(with T)+, T， hidden_dim(256)  calculate mean along T axis for the transformer output
 
-        # padding and mask again
-        start = 0
+        # # padding and mask again
+        # start = 0
+        # # boxes_features_padding = torch.zeros((B*n_max, T_o, self.hidden_dim), device=boxes_features.device)
         # boxes_features_padding = torch.zeros((B*n_max, T_o, self.hidden_dim), device=boxes_features.device)
-        boxes_features_padding = torch.zeros((B*n_max, T_o, self.hidden_dim), device=boxes_features.device)
-        # mask = torch.ones((B, T_o, n_max), dtype=torch.bool, device=boxes_features.device)
-        mask = torch.ones((B, n_max), dtype=torch.bool, device=boxes_features.device)
-        for i, n in enumerate(n_per_frame):
-            boxes_features_padding[i*n_max: i*n_max+n, :, :].copy_(boxes_features[start: start+n, :, :])
-            # mask[i, :, :n] = False
-            mask[i, :n] = False
-            start += n
-        boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).contiguous().mean(dim=(2))  # avg pooling on T dimension -> B, n_max, hidden_dim
-        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).permute(0, 2, 1, 3).contiguous().reshape(B*T, n_max, self.hidden_dim).permute(1, 0, 2).contiguous()
-        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T, n_max, self.hidden_dim)
-        mask = mask.reshape(B, n_max)  # removed T_o dimension
-        # mask = mask.reshape(B*T_o, n_max)  # n_max, B*T_o, hidden_dim, find connections between individuals per frame
-        # mask = mask.reshape(B*T_o, n_max).permute(1, 0)
+        # # mask = torch.ones((B, T_o, n_max), dtype=torch.bool, device=boxes_features.device)
+        # mask = torch.ones((B, n_max), dtype=torch.bool, device=boxes_features.device)
+        # for i, n in enumerate(n_per_frame):
+        #     boxes_features_padding[i*n_max: i*n_max+n, :, :].copy_(boxes_features[start: start+n, :, :])
+        #     # mask[i, :, :n] = False
+        #     mask[i, :n] = False
+        #     start += n
+        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).contiguous().mean(dim=(2))  # avg pooling on T_o dimension -> B, n_max, hidden_dim
+        # # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).permute(0, 2, 1, 3).contiguous().reshape(B*T_o, n_max, self.hidden_dim).permute(1, 0, 2).contiguous()
+        # # boxes_features_padding = boxes_features_padding.reshape(B, n_max, T_o, self.hidden_dim).permute(0, 2, 1, 3).reshape(B*T_o, n_max, self.hidden_dim)
+        # mask = mask.reshape(B, n_max)  # removed T_o dimension
+        # # mask = mask.reshape(B*T_o, n_max)  # n_max, B*T_o, hidden_dim, find connections between individuals per frame
+        # # mask = mask.reshape(B*T_o, n_max).permute(1, 0)
 
         # # debug: remove mask and padding:
-        # boxes_features_padding = boxes_features.reshape(B, n_max, T_o, self.hidden_dim).mean(dim=(2))
-        # mask = torch.zeros((B, n_max), dtype=torch.bool, device=boxes_features.device)
+        boxes_features_padding = boxes_features.reshape(B, n_max, T_o, self.hidden_dim).mean(dim=(2))
+        mask = torch.zeros((B, n_max), dtype=torch.bool, device=boxes_features.device)
         return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame, T_o, (FH, FW)
 
 class Joiner(nn.Sequential):
