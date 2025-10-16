@@ -187,14 +187,13 @@ class InceptionI3d(nn.Module):  #  output mixed_4b / mixed_3c features + mixed_5
         'Predictions',
     )
     INVALID=(
-        'MaxPool3d_5a_2x2',
-        'Mixed_5b',
-        'Mixed_5c',
+        # 'Mixed_5b',
+        # 'Mixed_5c',
         #'Logits',
         #'Predictions'
     )
 
-    def __init__(self, num_classes=400, spatial_squeeze=True,
+    def __init__(self, num_classes=157, spatial_squeeze=True,
                  final_endpoint='Logits', name='inception_i3d', in_channels=3, dropout_keep_prob=0.5):
         """Initializes I3D model instance.
         Args:
@@ -348,13 +347,14 @@ class InceptionI3d(nn.Module):  #  output mixed_4b / mixed_3c features + mixed_5
     def forward(self, x):
 
         for end_point in self.VALID_ENDPOINTS:  # including prediction and logits
-            if end_point == 'MaxPool3d_4a_3x3':  # can output features from other layers
+            if end_point == 'MaxPool3d_5a_2x2':  # can output features from other layers
                 action_feat = x
                 # break
-            if end_point == 'Mixed_4c':
-               break
             if end_point in self.end_points:  # without prediction and logits
                 x = self._modules[end_point](x)  # use _modules to work with dataparallel (output mixed_4f layer)
+                print(end_point)
+            if end_point == 'Mixed_5c':
+               break
 
         # x = self.logits(self.dropout(self.avg_pool(x)))
         # if self._spatial_squeeze:
@@ -370,21 +370,26 @@ class InceptionI3d(nn.Module):  #  output mixed_4b / mixed_3c features + mixed_5
         return self.avg_pool(x)
 
 class i3d(nn.Module):
-    def __init__(self, in_channel=480, out_channel=256):
+    def __init__(self, in_channel=832, in_channel_2=1024, out_channel=256):
         # mixed_4f: 832; mixed_3c: 480; mixed_4b: 512; mixed_5c: 1024
         super(i3d, self).__init__()
         self.in_channel = in_channel
         self.out_channel = out_channel
+        self.in_channel_2= in_channel_2
         self.i3d = InceptionI3d()  # T / 2 → 10 → 5;  H / 16, W / 16 → 224 → 14
 
-        self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1),
-                                        stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
+        # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1),
+        #                                 stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample along time dimension
+        self.conv1 = nn.Conv3d(self.in_channel, self.out_channel, kernel_size=1,
+                                        stride=(1, 1, 1), padding=(0, 0, 0))
+        self.conv2 = nn.Conv3d(self.in_channel_2, self.out_channel, kernel_size=1,
+                                        stride=(1, 1, 1), padding=(0, 0, 0))
         # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))
         # self.conv2=nn.ConvTranspose3d(1024, self.out_channel, (9, 1, 1), stride=(1, 1, 1))
-        self.conv2=nn.ConvTranspose3d(512, self.out_channel, (8, 1, 1), stride=(1, 1, 1))
+        # self.conv2=nn.ConvTranspose3d(480, self.out_channel, (6, 1, 1), stride=(1, 1, 1))
         self.i3d.load_state_dict(torch.load(
-            'models/pretrained_models/rgb_imagenet.pt'))
+            'models/pretrained_models/rgb_charades.pt'))
         # self.i3d.replace_logits(8)
 
     def forward(self, x):  # B, T, C, H, W = x.shape
@@ -392,14 +397,19 @@ class i3d(nn.Module):
         B, C, T, H, W = x.shape
         action_feat, x = self.i3d(x)
         action_feat = self.conv1(action_feat)
-        # print(action_feat.shape)
-        _, C_o, _, FH, FW = action_feat.shape  # B, C_o, T, FH, FW
-        action_feat = action_feat.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW)  # B*T,C,H,W
+        # _, C_o, _, FH, FW = action_feat.shape  # B, C_o, T, FH, FW
+        # action_feat = action_feat.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW)  # B*T,C,H,W
+
+        _, _, T_o, _, _ = action_feat.shape
+        action_feat = F.interpolate(
+            action_feat, size=(T_o, 90, 160), mode="trilinear", align_corners=False
+        ).contiguous()
+        action_feat = action_feat.mean(dim=(2))  # B, C, H', W'
 
         x = self.conv2(x)  # B, C_o2, T, FH2， FW2
-        # print(x.shape)
-        _, C_o2, _, FH2, FW2 = x.shape
-        x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o2, FH2, FW2)
+        # _, C_o2, _, FH2, FW2 = x.shape
+        # x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o2, FH2, FW2)
+        x = x.mean(dim=(2))  # B, C_o2, FH2，FW2(7)
         return action_feat, x
 
 
@@ -440,27 +450,13 @@ class InceptionI3d_noglobal(nn.Module):  #  output mixed_4b / mixed_3c features 
         'Predictions',
     )
     INVALID=(
-        'Conv3d_1a_7x7',
-        'MaxPool3d_2a_3x3',
-        'Conv3d_2b_1x1',
-        'Conv3d_2c_3x3',
-        'MaxPool3d_3a_3x3',
-        'Mixed_3b',
-        'Mixed_3c',
-        'MaxPool3d_4a_3x3',
-        'Mixed_4b',
-        'Mixed_4c',
-        'Mixed_4d',
-        'Mixed_4e',
-        'Mixed_4f',
-        'MaxPool3d_5a_2x2',
         'Mixed_5b',
         'Mixed_5c',
         # 'Logits',
         # 'Predictions'
     )
 
-    def __init__(self, num_classes=400, spatial_squeeze=True,
+    def __init__(self, num_classes=157, spatial_squeeze=True,
                  final_endpoint='Logits', name='inception_i3d', in_channels=3, dropout_keep_prob=0.5):
         """Initializes I3D model instance.
         Args:
@@ -643,16 +639,15 @@ class i3d_noglobal(nn.Module):
         self.i3d = InceptionI3d_noglobal()  # T / 2 → 10 → 5;  H / 16, W / 16 → 224 → 14
 
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1),
-        #                                 stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
+        #                                 stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample along time dimension
         self.conv1 = nn.Conv3d(self.in_channel, self.out_channel, kernel_size=1,
-                                        stride=(1, 1, 1), padding=(0, 0, 0))  # transpose convolutional layer, upsample
-        self.reduce = nn.Linear(self.in_channel, self.out_channel)
+                                        stride=(1, 1, 1), padding=(0, 0, 0))
         # output_size = (input - 1) * stride + kernel_size - 2 * padding + output_padding
         # self.conv1 = nn.ConvTranspose3d(self.in_channel, self.out_channel, (6, 1, 1), stride=(2, 1, 1))
         # self.conv2=nn.ConvTranspose3d(1024, self.out_channel, (9, 1, 1), stride=(1, 1, 1))
         # self.conv2=nn.ConvTranspose3d(480, self.out_channel, (6, 1, 1), stride=(1, 1, 1))
         self.i3d.load_state_dict(torch.load(
-            'models/pretrained_models/rgb_imagenet.pt'))
+            'models/pretrained_models/rgb_charades.pt'))
         # self.i3d.replace_logits(8)
 
     def forward(self, x):  # B, T, C, H, W = x.shape
@@ -660,16 +655,12 @@ class i3d_noglobal(nn.Module):
         B, C, T, H, W = x.shape
         x = self.i3d(x)
         x = self.conv1(x)
-        _, C_o, _, FH, FW = x.shape  # B, C_o, T, FH, FW
-        x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW).contiguous() # B*T,C,H,W
-        return x
+        _, _, T_o, _, _ = x.shape
+        x = F.interpolate(
+            x, size=(T_o, 90, 160), mode="trilinear", align_corners=False
+        ).contiguous()
 
-    # def forward(self, x):  # B, T, C, H, W = x.shape
-    #     x = x.permute(0, 2, 1, 3, 4).contiguous()
-    #     B, C, T, H, W = x.shape
-    #     x = self.i3d(x)
-    #     x = x.permute(0, 2, 3, 4, 1).contiguous()  # B, T, H, W, C
-    #     x = self.reduce(x)
-    #     _, _, FH, FW, C_o = x.shape  # B, T, H, W, C
-    #     x = x.permute(0, 1, 4, 2, 3).contiguous().reshape(-1, C_o, FH, FW).contiguous()  # B*T,C,H,W
-    #     return x
+        x = x.mean(dim=(2))  # B, C, H', W'
+        # _, C_o, _, FH, FW = x.shape  # B, C_o, T, FH, FW
+        # x = x.permute(0, 2, 1, 3, 4).contiguous().reshape(-1, C_o, FH, FW).contiguous() # B*T,C,H,W
+        return x

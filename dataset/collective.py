@@ -106,7 +106,7 @@ def collective_read_dataset(ann_files):
 
 
 '''
-data stucture:
+data structure:
 data: {1: {ann1}, 2: {ann2}, ... , seq: {annseq}}
 ann1(seq): {1: {ann1-1}, 2: {ann1-2}, ... , frame: {ann1-frame}}
 ann1(seq)-1(frame): {persons: [{person_id: 1, bbox: [], action:, 1, group_id: 1}, ..., {...}], 
@@ -114,8 +114,10 @@ ann1(seq)-1(frame): {persons: [{person_id: 1, bbox: [], action:, 1, group_id: 1}
 '''
 
 
-def collective_all_frames(anns):
-    return [(s, f) for s in anns for f in anns[s] if f != 1 and f != max(anns[s])]
+def collective_all_frames(anns, num_frames):
+    half_left = num_frames // 2
+    half_right = num_frames - half_left
+    return [(s, f) for s in anns for f in anns[s] if f != 1 and f != max(anns[s]) and f + half_right <= max(anns[s]) and f - half_left >= 1]
     # (sid, fid) with anns (every 10 frames: eg. 11, 21, 31, ...)
     # filtered the first and the last anns
 
@@ -221,7 +223,7 @@ class Collective_Dataset(data.Dataset):
         for i, (sid, src_fid, fid) in enumerate(select_frames[2]):  # 10 frames for 1 item
             img = cv2.imread(self.img_path + '/seq%02d/frame%04d.jpg' % (sid, fid))[:, :, [2, 1, 0]]  # BGR -> RGB  # H, W, 3
             img = Image.fromarray(img)
-            img, new_bboxes = self.transform(img, bbox)
+            img, new_bboxes = self.transform(img, bbox)  # bboxes did not changed here
             imgs.append(img)
 
         # labels for the whole video clip (the label of the key frame)

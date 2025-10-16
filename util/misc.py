@@ -13,6 +13,9 @@ import pickle
 from packaging import version
 from typing import Optional, List
 
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
@@ -273,6 +276,8 @@ def get_sha():
 def collate_fn(batch):
     featuremaps, bboxes, actions, activities, one_hot_matrix, meta = list(zip(*batch))  # featuremap: tuple?
     featuremaps = torch.stack(featuremaps)
+    fm_mask = torch.zeros_like(featuremaps)
+    featuremaps = NestedTensor(featuremaps, fm_mask)
     # featuremaps = nested_tensor_from_fm_list(featuremaps)
 
 
@@ -561,3 +566,128 @@ def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corne
         return _new_empty_tensor(input, output_shape)
     else:
         return torchvision.ops.misc.interpolate(input, size, scale_factor, mode, align_corners)
+
+
+@torch.no_grad()
+def viz_i3d_feature_and_rois(  # to verify if roi bboxes are correct
+    meta,
+    action_fm: torch.Tensor,
+    rois_source,                  # can be list[Tensor] (one rois per batch) or single Tensor (all samples concatenated together)
+    B: int,
+    T: int,
+    sample_idx: int = 0,          # ith sample
+    frame_idx: int = 0,           # tth frame
+    persons="all",                # "all" | int(topk) | List[int]（idx for individuals）
+    coords="feature",             # "feature" or "image"
+    H: int = None, W: int = None, # coords="image"
+    FH: int = None, FW: int = None,
+    channel="mean",               # "mean" or idx of channels
+    figsize=(5, 5),
+    rect_kwargs=None              # rectangle style dict，ep: {"linewidth":2}
+):
+    """
+    action_fm: (B*T, C, FH, FW) 的 I3D 特征
+    rois_source:
+        - list[Tensor]：every rois_i: (n_i*T, 5) = [bf_idx, x1, y1, x2, y2]
+        - Tensor：(K, 5)，all roi concatenated together
+    coords: rois coordinate system
+        - "feature": rois coordinates on features
+        - "image"  : rois coordinates on images
+    persons:
+        - "all"：draw all individuals
+        - int  ：only draw topk individuals
+        - List[int]： only draw certain individuals
+    channel:
+        - "mean"
+        - int    ：only draw certain channels
+
+    Usage:
+        viz_i3d_feature_and_rois(
+            meta[0],
+            action_fm,
+            all_rois,
+            B=B, T=T_o,  # test when B = 1
+            H=H, W=W,
+            sample_idx=0,
+            frame_idx=0,
+            persons="all",
+            coords="feature",
+            channel="mean",
+        )
+    """
+    assert action_fm.ndim == 4, f"action_fm shape should be (B*T, C, FH, FW), got {action_fm.shape}"
+    _, C, FH0, FW0 = action_fm.shape
+    FH = FH or FH0
+    FW = FW or FW0
+
+    # get the idx of this frame in action_fm
+    bf_idx = sample_idx * T + frame_idx
+    assert 0 <= bf_idx < action_fm.shape[0], f"bf_idx {bf_idx} out of range"
+
+    # get frame feature
+    feat = action_fm[bf_idx]  # (C, FH, FW)
+
+    # visualization
+    if channel == "mean":
+        img = feat.mean(dim=0)
+    else:
+        assert isinstance(channel, int) and 0 <= channel < feat.shape[0], f"invalid channel={channel}"
+        img = feat[channel]
+    img = img.detach().float()
+    img = (img - img.min()) / (img.max() - img.min() + 1e-8)
+
+    # collect the rois (bf_idx matching) for this frame
+    if isinstance(rois_source, list):
+        rois_all = rois_source[sample_idx]  # (n_i*T, 5)
+        # in this sample，continuous T raws are corresponding to one individual；but can be also filtered by bf_idx
+        sel = (rois_all[:, 0].long() == bf_idx)
+        rois_this_frame = rois_all[sel]  # (n_t, 5)
+    else:
+        # single Tensor，directly filter bf_idx
+        rois_all = rois_source
+        sel = (rois_all[:, 0].long() == bf_idx)
+        rois_this_frame = rois_all[sel]
+
+    # select individuals to be drawn
+    if persons == "all":
+        pass
+    elif isinstance(persons, int):
+        rois_this_frame = rois_this_frame[:persons]
+    else:
+        # persons is idx list：every individual only has one bbox in one frame, get by idx directly
+        rois_this_frame = rois_this_frame[persons]
+
+    # transfer rois coordinate to feature coordinate
+    if coords == "image":
+        assert H is not None and W is not None, "coords='image' needs H,W"
+        sx = FW / float(W)
+        sy = FH / float(H)
+        rois_feat = rois_this_frame.clone()
+        rois_feat[:, [1, 3]] *= sx  # x1, x2
+        rois_feat[:, [2, 4]] *= sy  # y1, y2
+    else:
+        rois_feat = rois_this_frame
+
+    # draw
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.imshow(img.cpu().numpy(), origin="upper")
+    rk = {"fill": False, "linewidth": 2}
+    if rect_kwargs:
+        rk.update(rect_kwargs)
+
+    # draw each boxes
+    for r in rois_feat:
+        _, x1, y1, x2, y2 = r.detach().cpu().tolist()
+
+        x1 = max(0.0, min(float(x1), FW - 1))
+        x2 = max(0.0, min(float(x2), FW - 1))
+        y1 = max(0.0, min(float(y1), FH - 1))
+        y2 = max(0.0, min(float(y2), FH - 1))
+        if x2 > x1 and y2 > y1:
+            ax.add_patch(Rectangle((x1, y1), x2 - x1, y2 - y1, **rk))
+
+    ax.set_title(f"I3D feat | sid={meta['sid']}, fid={int(meta['src_fid'])}, frame={frame_idx}, bf_idx={bf_idx}")
+    ax.set_xlim([0, FW])
+    ax.set_ylim([FH, 0])  # y-axis is aheading down
+    plt.tight_layout()
+    plt.show()

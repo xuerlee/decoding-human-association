@@ -114,8 +114,10 @@ ann1(seq)-1(frame): {persons: [{person_id: 1, bbox: [], action:, 1, group_id: 1}
 '''
 
 
-def collective_all_frames(anns):
-    return [(s, f) for s in anns for f in anns[s] if f != 1 and f != max(anns[s])]
+def collective_all_frames(anns, num_frames):
+    half_left = num_frames // 2
+    half_right = num_frames - half_left
+    return [(s, f) for s in anns for f in anns[s] if f != 1 and f != max(anns[s]) and f + half_right <= max(anns[s]) and f - half_left >= 1]
     # (sid, fid) with anns (every 10 frames: eg. 11, 21, 31, ...)
     # filtered the first and the last anns
 

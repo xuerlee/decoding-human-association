@@ -12,15 +12,18 @@ def build(args):
     ann_root = Path(args.ann_path)
     assert ann_root.exists(), f'provided bbox path {ann_root} does not exist'
 
+    num_frames = args.num_frames
+
+
     if args.feature_file == 'collective':
         train_fm_file, train_ann_file, test_fm_file, test_ann_file = collective_path(fm_root, ann_root)
 
         train_anns = collective_read_dataset(train_ann_file)  # ann dictionary
-        train_frames = collective_all_frames(train_anns)  # frame and sec ids: (s, f)
+        train_frames = collective_all_frames(train_anns, num_frames)  # frame and sec ids: (s, f)
         # print(train_frames)
 
         test_anns = collective_read_dataset(test_ann_file)
-        test_frames = collective_all_frames(test_anns)
+        test_frames = collective_all_frames(test_anns, num_frames)
 
         train_dataset = Collective_FeatureMapDataset(train_anns, train_frames, args.feature_map_path,
                                           num_frames=args.num_frames, is_training=args.is_training)

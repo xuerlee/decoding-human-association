@@ -32,14 +32,14 @@ def get_args_parser():
     parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=150, type=int)
-    parser.add_argument('--lr_drop', default=[50, 100], type=int)
+    parser.add_argument('--lr_drop', default=[50, 100], nargs='+', type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
 
     # * Transformer
-    parser.add_argument('--enc_layers', default=2, type=int,
+    parser.add_argument('--enc_layers', default=6, type=int,
                         help="Number of encoding layers in the transformer")
-    parser.add_argument('--dec_layers', default=1, type=int,
+    parser.add_argument('--dec_layers', default=6, type=int,
                         help="Number of decoding layers in the transformer")
     parser.add_argument('--dim_feedforward', default=2048, type=int,
                         help="Intermediate size of the feedforward layers in the transformer blocks")
@@ -54,7 +54,7 @@ def get_args_parser():
     parser.add_argument('--pre_norm', action='store_true')  # layer norm (similar to batch norm, normalize in each input tensor)
 
     # Loss
-    parser.add_argument('--no_aux_loss', dest='aux_loss', action='store_false',
+    parser.add_argument('--aux_loss', default=False, type=bool,
                         help="Disables auxiliary decoding losses (loss at each layer)")
     # * Matcher
     parser.add_argument('--set_cost_activity_class', default=2, type=float,
@@ -89,7 +89,7 @@ def get_args_parser():
                         help='width of resized images')
     parser.add_argument('--img_h', default=224, type=int,
                         help='heigh of resized images')
-    parser.add_argument('--num_frames', default=7, type=int,
+    parser.add_argument('--num_frames', default=10, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
                         help='number of feature channels output by the feature extraction part')
@@ -151,10 +151,14 @@ def main(args):
 
     param_dicts = {"params": [p for n, p in model_without_ddp.named_parameters() if p.requires_grad]},
 
-    optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
-                                  weight_decay=args.weight_decay)
-    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_drop, gamma=0.1)
+    # optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
+    #                               weight_decay=args.weight_decay)
+    # # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
+    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_drop, gamma=0.1)
+
+    optimizer = torch.optim.SGD(param_dicts, lr=args.lr, momentum=0.9, weight_decay=0.0000001)
+    lr_scheduler= torch.optim.lr_scheduler.MultiStepLR(optimizer, args.lr_drop)
+
 
     if args.input_format == 'feature':
         dataset_train, dataset_val = build_fmset(args=args)

@@ -46,16 +46,16 @@ class Transformer(nn.Module):
 
     def forward(self, src, mask, query_embed, pos_embed):
         # query_embed: num_queries, hidden_dim
-        # src: n_max, B*T, hidden_dim
-        # mask: n_max, B*T
-        n_max, B_T, hidden_dim = src.shape
-        query_embed = query_embed.unsqueeze(1).repeat(1, B_T, 1)  # num_queries, B*T, hidden_dim
+        # src: n_max, B, hidden_dim
+        # mask: B, n_max
+        n_max, B, hidden_dim = src.shape
+        query_embed = query_embed.unsqueeze(1).repeat(1, B, 1)  # num_queries, B, hidden_dim
 
         tgt = torch.zeros_like(query_embed)
-        memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)  # memory: n_max, B*T, hidden_dim
+        memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)  # memory: n_max, B, hidden_dim
         hs, attention_weights = self.decoder(tgt, memory, memory_key_padding_mask=mask,
-                          pos=pos_embed, query_pos=query_embed)  # hs: (num_layers,) num_queries, B*T, hidden_dim; attention weights: B*T, num_queries, n_max
-        return hs.transpose(1, 2), memory.permute(1, 0, 2), attention_weights  # hs: (num_layers,), B*T, num_queries, hidden_dim, memory: B*T, n_max, hidden_dim
+                          pos=pos_embed, query_pos=query_embed)  # hs: (num_layers,) num_queries, B, hidden_dim; attention weights: B, num_queries, n_max
+        return hs.transpose(1, 2), memory.permute(1, 0, 2), attention_weights  # hs: (num_layers,), B, num_queries, hidden_dim, memory: B, n_max, hidden_dim
 
 
 
