@@ -220,11 +220,12 @@ class SetCriterion(nn.Module):
     def loss_grouping(self, outputs, targets, indices, num_groups):
         """Compute the losses related to the grouping results, using the binary cross entropy loss
         """
+        # TODO: cross entropy
         assert 'attention_weights' in outputs
         src_aw = outputs['attention_weights']  # B, n_max, num_queries
 
         tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
-        tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max
+        tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max  # regard persons as cls
 
         idx = self._get_src_permutation_idx(indices)
         target_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(tgt_one_hot_ini, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
@@ -232,9 +233,16 @@ class SetCriterion(nn.Module):
                                     dtype=torch.int, device=src_aw.device)
         target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
         target_one_hot[idx] = target_one_hot_o  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
-        loss_grouping = F.binary_cross_entropy(src_aw.transpose(1, 2), target_one_hot.float(), reduction='none')
+        # loss w.s.t assigning people to group
+        # loss_grouping = F.binary_cross_entropy(src_aw.transpose(1, 2), target_one_hot.float())
+
+        # loss w.s.t grouping people
+        target_group = target_one_hot.transpose(1, 2).argmax(-1)  # B, n_max
+        loss_grouping = F.cross_entropy(src_aw.transpose(1, 2), target_group)
+
         losses = {}
-        losses['loss_grouping'] = loss_grouping.sum() / num_groups
+        # losses['loss_grouping'] = loss_grouping.sum() / num_groups
+        losses['loss_grouping'] = loss_grouping
 
         return losses
 
@@ -320,7 +328,7 @@ class SetCriterion(nn.Module):
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs' and k != 'pred_action_logits'}
 
         # Retrieve the matching between the outputs of the last layer and the targets
-        indices = self.matcher(outputs_without_aux, targets[1:])
+        indices = self.matcher(outputs_without_aux, targets[1:])  # src id, tgt id
         # Compute the average number of target groups accross all nodes, for normalization purposes
         num_groups = (targets[1].decompose()[0] != -1).sum()
         num_groups = torch.as_tensor([num_groups], dtype=torch.float, device=next(iter(outputs.values())).device)

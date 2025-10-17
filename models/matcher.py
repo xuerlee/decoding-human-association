@@ -79,37 +79,26 @@ class HungarianMatcher(nn.Module):
             n_group = len(tgt_activity_ids_b)
             n_person = tgt_one_hot_b.shape[0]
             out_activity_prob_b = out_activity_prob[b]  # [num_queries, num_classes]
-            out_attw_b = out_attw[b][0: n_person, :]
+            out_attw_b = out_attw[b][0: n_person, :]  # [num_persons, num_queries]
 
             tgt_one_hot_b = tgt_one_hot_b.T  # num_groups, n_persons
-            out_attw_b = out_attw_b. T  # num_queries, n_persons
+            out_attw_b = out_attw_b.T  # num_queries, n_persons
 
             grouping_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             activity_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
-            for i, out_attw_b_query in enumerate(out_attw_b):
-                for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):
-                    grouping_cost[i][j] = F.binary_cross_entropy(out_attw_b_query.float(), tgt_one_hot_b_group.float())  # direction: -> smaller cost
+            for i, out_attw_b_query in enumerate(out_attw_b):  # n_persons (can be regarded as cls) for certain query
+                for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):  # n_persons (can be regarded as cls) for certain group
+                    grouping_cost[i][j] = F.binary_cross_entropy(out_attw_b_query.float(), tgt_one_hot_b_group.float())  # direction: -> smaller cost  1.  multi cls(persons) classification for groups
                     # activity_cost[i][j] = F.cross_entropy(out_activity_prob_b[i].float(), tgt_activity_ids_b[j])
-                    # print(tgt_activity_ids_b[j], out_activity_prob_b[i].shape)
-                    activity_cost[i][j] = -out_activity_prob_b[i].float()[tgt_activity_ids_b[j]]  # direction: -> smaller cost
-
-            # grouping_cost = F.binary_cross_entropy(
-            #     out_attw_b.unsqueeze(1),  # [num_queries, 1, n_persons]
-            #     tgt_one_hot_b.unsqueeze(0),  # [1, n_groups, n_persons]
-            #     reduction='none'
-            # ).mean(dim=-1)  # [num_queries, n_groups]
-            # logits = out_activity_prob_b.unsqueeze(1).expand(-1, n_group, -1).reshape(-1, num_activity_classes)  # n_queries * n_groups, num_classes
-            # targets = tgt_activity_ids_b.unsqueeze(0).expand(num_queries, -1).reshape(-1)  # n_queries * n_groups
-            # activity_cost_flat = F.cross_entropy(logits, targets, reduction='none')
-            # activity_cost = activity_cost_flat.view(num_queries, n_group)
+                    activity_cost[i][j] = -out_activity_prob_b[i].float()[tgt_activity_ids_b[j]]  # direction: -> smaller cost  0.
 
             cost_b = self.cost_bce * grouping_cost + self.cost_activity_class * activity_cost
             cost_b = cost_b.cpu().numpy()
             indices_b = linear_sum_assignment(cost_b)
             indices.append(indices_b)  # indices: B, 2 (prediction_id, target_id), num_groups
-
         return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]  # list with bs length, each element: (src id, tgt id)
 
 
 def build_matcher(args):
+    # TODO: ADD cost_action
     return HungarianMatcher(cost_activity_class=args.set_cost_activity_class, cost_action_class=args.set_cost_action_class, cost_bce=args.set_cost_bce)
