@@ -88,7 +88,7 @@ class HungarianMatcher(nn.Module):
             activity_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             for i, out_attw_b_query in enumerate(out_attw_b):  # n_persons (can be regarded as cls) for certain query
                 for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):  # n_persons (can be regarded as cls) for certain group
-                    grouping_cost[i][j] = F.binary_cross_entropy(out_attw_b_query.float(), tgt_one_hot_b_group.float())  # direction: -> smaller cost  1.  multi cls(persons) classification for groups
+                    grouping_cost[i][j] = F.binary_cross_entropy_with_logits(out_attw_b_query.float(), tgt_one_hot_b_group.float())  # direction: -> smaller cost  1.  multi cls(persons) classification for groups
                     # activity_cost[i][j] = F.cross_entropy(out_activity_prob_b[i].float(), tgt_activity_ids_b[j])
                     activity_cost[i][j] = -out_activity_prob_b[i].float()[tgt_activity_ids_b[j]]  # direction: -> smaller cost  0.
 

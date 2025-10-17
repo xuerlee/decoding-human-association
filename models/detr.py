@@ -96,7 +96,7 @@ class DETR(nn.Module):
         # for grouping based on attention weights
         attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
         attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
-        attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
+        # attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
         attention_weights = attention_weights * mask.unsqueeze(-1)  # B, n_max, num_queries
 
         out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
@@ -234,7 +234,7 @@ class SetCriterion(nn.Module):
         target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
         target_one_hot[idx] = target_one_hot_o  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
         # loss w.s.t assigning people to group
-        # loss_grouping = F.binary_cross_entropy(src_aw.transpose(1, 2), target_one_hot.float())
+        # loss_grouping = F.binary_cross_entropy_with_logits(src_aw.transpose(1, 2), target_one_hot.float())
 
         # loss w.s.t grouping people
         target_group = target_one_hot.transpose(1, 2).argmax(-1)  # B, n_max
