@@ -234,11 +234,15 @@ class SetCriterion(nn.Module):
         target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
         target_one_hot[idx] = target_one_hot_o  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
         # loss w.s.t assigning people to group
-        # loss_grouping = F.binary_cross_entropy_with_logits(src_aw.transpose(1, 2), target_one_hot.float())
+        pos = target_one_hot.sum()
+        neg = target_one_hot.numel() - pos
+        pos_weight = (neg / (pos + 1e-6)).clamp(1., 50.)
+        pos_weight = pos_weight.to(target_one_hot.device)
+        loss_grouping = F.binary_cross_entropy_with_logits(src_aw.transpose(1, 2), target_one_hot.float(), pos_weight=pos_weight)
 
         # loss w.s.t grouping people
-        target_group = target_one_hot.transpose(1, 2).argmax(-1)  # B, n_max
-        loss_grouping = F.cross_entropy(src_aw.transpose(1, 2), target_group)
+        # target_group = target_one_hot.transpose(1, 2).argmax(-1)  # B, n_max
+        # loss_grouping = F.cross_entropy(src_aw.transpose(1, 2), target_group)
 
         losses = {}
         # losses['loss_grouping'] = loss_grouping.sum() / num_groups
