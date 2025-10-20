@@ -59,7 +59,8 @@ class HungarianMatcher(nn.Module):
 
         # We flatten to compute the cost matrices in a batch
         # approximate negative log likelihood cost, add negative (omit log for cost) later: cost_class = -out_prob[:, tgt_ids]
-        out_activity_prob = outputs["pred_activity_logits"].flatten(0, 1).softmax(-1).view(bs, num_queries, -1)  # [batch_size, num_queries, num_activity_classes]
+        # out_activity_prob = outputs["pred_activity_logits"].flatten(0, 1).softmax(-1).view(bs, num_queries, -1)  # [batch_size, num_queries, num_activity_classes]
+        out_activity_prob = outputs["pred_activity_logits"].view(bs, num_queries, -1)  # [batch_size, num_queries, num_activity_classes]
         out_attw = outputs['attention_weights']  # B, n_max, num_queries
         # only for calculating cross entropy: F.cross entropy = softmax + negative log likelihood loss
         # out_activity_prob = outputs["pred_activity_logits"]  # [batch_size, num_queries, num_activity_classes]
@@ -74,7 +75,7 @@ class HungarianMatcher(nn.Module):
         indices = []
         for b in range(bs):
             tgt_activity_ids_b = tgt_activity_ids[b][valid_areas_ids[b][0]: valid_areas_ids[b][1]]  # [num_group]
-            # tgt_activity_ids_b = F.one_hot(tgt_activity_ids_b, num_activity_classes)
+            tgt_activity_ids_b = F.one_hot(tgt_activity_ids_b, num_activity_classes)  # num_group, num_activity_cls
             tgt_one_hot_b = tgt_one_hot[b][valid_areas_one_hot[b][0]: valid_areas_one_hot[b][1], valid_areas_one_hot[b][2]: valid_areas_one_hot[b][3]]  # n_persons, n_groups
             n_group = len(tgt_activity_ids_b)
             n_person = tgt_one_hot_b.shape[0]
@@ -90,8 +91,8 @@ class HungarianMatcher(nn.Module):
                 for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):  # n_persons (can be regarded as cls) for certain group
                     grouping_cost[i][j] = F.binary_cross_entropy_with_logits(out_attw_b_query.float(), tgt_one_hot_b_group.float())  # direction: -> smaller cost  1.  multi cls(persons) classification for groups
                     # activity_cost[i][j] = F.cross_entropy(out_activity_prob_b[i].float(), tgt_activity_ids_b[j])
-                    activity_cost[i][j] = -out_activity_prob_b[i].float()[tgt_activity_ids_b[j]]  # direction: -> smaller cost  0.
-
+                    # activity_cost[i][j] = -out_activity_prob_b[i].float() * tgt_activity_ids_b[j] - (1 - out_activity_prob_b[i].float()) * (1 - tgt_activity_ids_b[j])  # direction: -> smaller cost  0.
+                    activity_cost[i][j] = F.binary_cross_entropy_with_logits(out_activity_prob_b[i].float(), tgt_activity_ids_b[j].float())
             cost_b = self.cost_bce * grouping_cost + self.cost_activity_class * activity_cost
             cost_b = cost_b.cpu().numpy()
             indices_b = linear_sum_assignment(cost_b)
