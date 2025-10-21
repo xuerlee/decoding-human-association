@@ -85,7 +85,7 @@ class DETR(nn.Module):
         mask = ~mask.view(B, n_max)
         outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
-        outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         action_scores = outputs_action_class
 
         # group activity classification
@@ -97,7 +97,7 @@ class DETR(nn.Module):
         attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
         attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
         # attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
-        attention_weights = attention_weights * mask.unsqueeze(-1)  # B, n_max, num_queries
+        # attention_weights = attention_weights * mask.unsqueeze(-1)  # B, n_max, num_queries
 
         out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
 
@@ -190,7 +190,7 @@ class SetCriterion(nn.Module):
         tgt_action_ids = tgt_action_ids[idx]  # n_persons in B
         src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
         # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
-        loss_ce = F.cross_entropy(src_logits, tgt_action_ids)
+        loss_ce = F.cross_entropy(src_logits, tgt_action_ids, ignore_index=-1)  # ignore index instead of multiplying mask
         losses = {'loss_action': loss_ce}
 
         if log:
@@ -226,6 +226,7 @@ class SetCriterion(nn.Module):
 
         tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
         tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max  # regard persons as cls
+        mask_one_hot = mask_one_hot.transpose(1, 2)
 
         idx = self._get_src_permutation_idx(indices)
         target_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(tgt_one_hot_ini, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
@@ -233,12 +234,17 @@ class SetCriterion(nn.Module):
                                     dtype=torch.int, device=src_aw.device)
         target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
         target_one_hot[idx] = target_one_hot_o  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
+        mask_one_hot = ~mask_one_hot
+        mask_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(mask_one_hot, indices)])
+        valid_mask = torch.full(src_aw.shape, False, dtype=torch.bool, device=src_aw.device)
+        valid_mask = valid_mask.transpose(1, 2)   # B, num_queries, n_max
+        valid_mask[idx] = mask_one_hot_o
         # loss w.s.t assigning people to group
-        pos = target_one_hot.sum()
-        neg = target_one_hot.numel() - pos
+        pos = target_one_hot[valid_mask].sum()
+        neg = target_one_hot[valid_mask].numel() - pos
         pos_weight = (neg / (pos + 1e-6)).clamp(1., 50.)
         pos_weight = pos_weight.to(target_one_hot.device)
-        loss_grouping = F.binary_cross_entropy_with_logits(src_aw.transpose(1, 2), target_one_hot.float(), pos_weight=pos_weight)
+        loss_grouping = F.binary_cross_entropy_with_logits(src_aw.transpose(1, 2)[valid_mask], target_one_hot[valid_mask].float(), pos_weight=pos_weight)
 
         # loss w.s.t grouping people
         # target_group = target_one_hot.transpose(1, 2).argmax(-1)  # B, n_max
