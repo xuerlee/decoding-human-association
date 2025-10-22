@@ -75,9 +75,9 @@ def get_args_parser():
                         default='/home/jiqqi/data/social_CAD/anns', type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
-    parser.add_argument('--img_w', default=224, type=int,
+    parser.add_argument('--img_w', default=720, type=int,
                         help='width of resized images')
-    parser.add_argument('--img_h', default=224, type=int,
+    parser.add_argument('--img_h', default=480, type=int,
                         help='heigh of resized images')
     parser.add_argument('--num_frames', default=10, type=int,
                         help='number of stacked frame features')
@@ -86,14 +86,14 @@ def get_args_parser():
     parser.add_argument('--roi_align', default=[7, 7], type=int,  # openpifpaf output
                         help='size of roi_align')
 
-    parser.add_argument('--output_dir', default='output_imgs/i3d/i3d_action_enc6_4f/test',
+    parser.add_argument('--output_dir', default='output_imgs/restartall_groupinglossBCEweights_activityBCEcost/test_action',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
                         # default='',
-                        default='output_dir/i3d/i3d_action_enc6_4f/checkpoint0299.pth',
+                        default='output_dir/restartall_groupinglossBCEweights_activityBCEcost/checkpoint0249.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')

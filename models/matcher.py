@@ -59,11 +59,10 @@ class HungarianMatcher(nn.Module):
 
         # We flatten to compute the cost matrices in a batch
         # approximate negative log likelihood cost, add negative (omit log for cost) later: cost_class = -out_prob[:, tgt_ids]
-        # out_activity_prob = outputs["pred_activity_logits"].flatten(0, 1).softmax(-1).view(bs, num_queries, -1)  # [batch_size, num_queries, num_activity_classes]
+        # F.cross entropy = softmax + negative log likelihood loss; F.binary_cross_entropy_with_logits = sigmoid + BCE
+        # out_activity_prob = outputs["pred_activity_logits"].flatten(0, 1).softmax(-1).view(bs, num_queries, -1)  # get likelihood, [batch_size, num_queries, num_activity_classes]
         out_activity_prob = outputs["pred_activity_logits"].view(bs, num_queries, -1)  # [batch_size, num_queries, num_activity_classes]
         out_attw = outputs['attention_weights']  # B, n_max, num_queries
-        # only for calculating cross entropy: F.cross entropy = softmax + negative log likelihood loss
-        # out_activity_prob = outputs["pred_activity_logits"]  # [batch_size, num_queries, num_activity_classes]
 
         # target labels and assignments
         tgt_activity_ids, mask_ids = targets[0].decompose()  # B, num_group_max

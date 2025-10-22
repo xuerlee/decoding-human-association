@@ -226,7 +226,7 @@ class SetCriterion(nn.Module):
 
         tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
         tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max  # regard persons as cls
-        mask_one_hot = mask_one_hot.transpose(1, 2)
+        mask_one_hot = mask_one_hot.transpose(1, 2)  # B, num_groups_max, n_max
 
         idx = self._get_src_permutation_idx(indices)
         target_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(tgt_one_hot_ini, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
@@ -234,11 +234,13 @@ class SetCriterion(nn.Module):
                                     dtype=torch.int, device=src_aw.device)
         target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
         target_one_hot[idx] = target_one_hot_o  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
+
         mask_one_hot = ~mask_one_hot
         mask_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(mask_one_hot, indices)])
         valid_mask = torch.full(src_aw.shape, False, dtype=torch.bool, device=src_aw.device)
         valid_mask = valid_mask.transpose(1, 2)   # B, num_queries, n_max
         valid_mask[idx] = mask_one_hot_o
+
         # loss w.s.t assigning people to group
         pos = target_one_hot[valid_mask].sum()
         neg = target_one_hot[valid_mask].numel() - pos
@@ -272,7 +274,7 @@ class SetCriterion(nn.Module):
         valid_person_mask = ~valid_mask  # B, n_max
         valid_group_mask = (out_group_labels != self.num_activity_classes)  # B, num_queries  mask empty groups
 
-        loss = 0
+        loss = 0  # multi actions - multi actions
         B = valid_mask.shape[0]
         for b in range(B):
             src_aw_b = src_aw[b][valid_person_mask[b]]  # n_b, num_queries
