@@ -18,7 +18,7 @@ class HungarianMatcher(nn.Module):
     while the others are un-matched (and thus treated as empty groups).
     """
 
-    def __init__(self, cost_activity_class: float = 1, cost_action_class: float = 1, cost_bce: float = 1):
+    def __init__(self, cost_activity_class: float = 1, cost_action_class: float = 1, cost_bce: float = 1, cost_size: float = 1):
         """Creates the matcher
 
         Params:
@@ -30,7 +30,8 @@ class HungarianMatcher(nn.Module):
         self.cost_activity_class = cost_activity_class
         self.cost_action_class = cost_action_class
         self.cost_bce = cost_bce
-        assert cost_activity_class != 0 or cost_action_class != 0 or cost_bce != 0, "all costs cant be 0"
+        self.cost_size = cost_size
+        assert cost_activity_class != 0 or cost_action_class != 0 or cost_bce != 0 or cost_size != 0, "all costs cant be 0"
 
     @torch.no_grad()
     def forward(self, outputs, targets):
@@ -80,18 +81,25 @@ class HungarianMatcher(nn.Module):
             n_person = tgt_one_hot_b.shape[0]
             out_activity_prob_b = out_activity_prob[b]  # [num_queries, num_classes]
             out_attw_b = out_attw[b][0: n_person, :]  # [num_persons, num_queries]
+            # out_attw_b = out_attw_b.softmax(dim=-1)
 
             tgt_one_hot_b = tgt_one_hot_b.T  # num_groups, n_persons
             out_attw_b = out_attw_b.T  # num_queries, n_persons
 
+            # tgt_size = tgt_one_hot_b.sum(dim=-1)
+            # out_size = out_attw_b.sum(dim=-1)
+
             grouping_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             activity_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
-            for i, out_attw_b_query in enumerate(out_attw_b):  # n_persons (can be regarded as cls) for certain query
+            # size_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
+            for i, out_attw_b_query in enumerate(out_attw_b):  # n_persons (can be regarded as cls) for certain query: multi cls classification for group
                 for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):  # n_persons (can be regarded as cls) for certain group
                     grouping_cost[i][j] = F.binary_cross_entropy_with_logits(out_attw_b_query.float(), tgt_one_hot_b_group.float())  # direction: -> smaller cost  1.  multi cls(persons) classification for groups
                     # activity_cost[i][j] = F.cross_entropy(out_activity_prob_b[i].float(), tgt_activity_ids_b[j])
                     # activity_cost[i][j] = -out_activity_prob_b[i].float() * tgt_activity_ids_b[j] - (1 - out_activity_prob_b[i].float()) * (1 - tgt_activity_ids_b[j])  # direction: -> smaller cost  0.
                     activity_cost[i][j] = F.binary_cross_entropy_with_logits(out_activity_prob_b[i].float(), tgt_activity_ids_b[j].float())
+
+
             cost_b = self.cost_bce * grouping_cost + self.cost_activity_class * activity_cost
             cost_b = cost_b.cpu().numpy()
             indices_b = linear_sum_assignment(cost_b)
@@ -101,4 +109,4 @@ class HungarianMatcher(nn.Module):
 
 def build_matcher(args):
     # TODO: ADD cost_action
-    return HungarianMatcher(cost_activity_class=args.set_cost_activity_class, cost_action_class=args.set_cost_action_class, cost_bce=args.set_cost_bce)
+    return HungarianMatcher(cost_activity_class=args.set_cost_activity_class, cost_action_class=args.set_cost_action_class, cost_bce=args.set_cost_bce, cost_size=args.set_cost_size)
