@@ -130,10 +130,10 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
         if if_confuse:
             pred_action_logits = outputs['pred_action_logits']
             action_gts = targets[1].decompose()[0].cpu().numpy()
-            mask = ~targets[1].decompose()[0].cpu().numpy()
+            valid_mask = (action_gts != -1)
             for i, pred_action_logit in enumerate(pred_action_logits):
                 # pred_action_logit = pred_action_logits[i][~(pred_action_logits[i] == 0).all(dim=1)]
-                pred_action_logit = pred_action_logits[i][mask[i]]
+                pred_action_logit = pred_action_logits[i][valid_mask[i]]
                 pred_action = pred_action_logit.argmax(dim=-1).cpu().numpy()
                 all_action_preds.extend(pred_action)
                 action_gt = action_gts[i][~(action_gts[i] == -1)]
