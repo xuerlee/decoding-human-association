@@ -37,7 +37,7 @@ class DETR(nn.Module):
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
-        # self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
+        self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
         self.dropout = nn.Dropout(p=0.1)  # set zeros randomly, no influences on valid mask
         self.backbone = backbone
         self.aux_loss = aux_loss
@@ -66,14 +66,14 @@ class DETR(nn.Module):
         hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
         # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # without positional embeddings
 
-        # without Transformer (for debug)
+        # only individual action (for debug)
         # B = src_f.shape[0]
         # n_max = src_b.shape[1]
-        # boxes_features = self.dropout(boxes_features)
+        # memory = self.dropout(memory)
         # mask = ~mask.view(B, n_max)  # B, n_max
-        # outputs_action_class = self.action_class_embed(boxes_features)  # B, n_max, num_action_classes
+        # outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classes
         # outputs_action_class = self.dropout(outputs_action_class)
-        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        # # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         # action_scores = outputs_action_class
         # out = {'pred_action_logits': action_scores}
 
@@ -95,7 +95,7 @@ class DETR(nn.Module):
 
         # for grouping based on attention weights
         attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
-        # attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
+        attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
         # attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
         # attention_weights = attention_weights * mask.unsqueeze(-1)  # B, n_max, num_queries
 
@@ -424,9 +424,9 @@ def build(args):
         weight_dict.update(aux_weight_dict)
 
     # losses = ['activity', 'grouping', 'action', 'cardinality', 'consistency']
-    losses = ['activity', 'grouping', 'action', 'cardinality']
+    # losses = ['activity', 'grouping', 'action', 'cardinality']
     # losses = ['activity', 'grouping', 'action']
-    # losses = ['action']
+    losses = ['action']
     criterion = SetCriterion(args.feature_file, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
                              eos_coef=args.eos_coef, losses=losses)
     criterion.to(device)
