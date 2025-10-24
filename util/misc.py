@@ -481,21 +481,21 @@ def init_distributed_mode(args):
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
-    # print(output, target)
+    # output: num_samples, num_cls
+    # target: num_samples
     if target.numel() == 0:
         return [torch.zeros([], device=output.device)]
-    maxk = max(topk)
-    batch_size = target.size(0)
+    maxk = max(topk)  # pick the maximum one in the tuple topk(1, 5, 10) -> 5
+    num_samples = target.size(0)
 
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
-
+    _, pred = output.topk(maxk, 1, True, True)  # pick the class idxes of the top maxk big elements along dim 1
+    pred = pred.t()  # maxk, num_samples
+    correct = pred.eq(target.view(1, -1).expand_as(pred))  # expand target to maxk, num_samples, return True where target is equal to pred
     res = []
-    for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        res.append(correct_k.mul_(100.0 / batch_size))
-    return res
+    for k in topk:  # res for top1, top5...
+        correct_k = correct[:k].view(-1).float().sum(0)  # the number of correct predictions in one batch
+        res.append(correct_k.mul_(100.0 / num_samples))  # percentage of correctly predicted sampels
+    return res  # whole data precision
 
 def per_class_accuracy(output, target, num_classes):
     _, pred = output.topk(1, dim=1)
@@ -503,13 +503,13 @@ def per_class_accuracy(output, target, num_classes):
 
     acc_list = []
     for i in range(num_classes):
-        mask = target == i
-        total = mask.sum()
-        if total == 0:
+        mask_t = target == i
+        total_t = mask_t.sum()
+        if total_t == 0:
             acc_list.append(float('nan'))
         else:
-            correct = (pred[mask] == i).sum()
-            acc_list.append(100.0 * correct.item() / total.item())
+            correct = (pred[mask_t] == i).sum()
+            acc_list.append(100.0 * correct.item() / total_t.item())  # per cls recall
     return acc_list
 
 
