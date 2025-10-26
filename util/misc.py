@@ -506,7 +506,7 @@ def per_class_accuracy(output, target, num_classes):
         mask_t = target == i
         total_t = mask_t.sum()
         if total_t == 0:
-            acc_list.append(float('100.0'))
+            acc_list.append(float('nan'))
         else:
             correct = (pred[mask_t] == i).sum()
             acc_list.append(100.0 * correct.item() / total_t.item())  # per cls recall

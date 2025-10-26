@@ -197,7 +197,7 @@ class SetCriterion(nn.Module):
             losses['idv_action_class_error'] = 100 - accuracy(src_logits, tgt_action_ids)[0]
             class_acc = per_class_accuracy(src_logits, tgt_action_ids, num_classes=src_logits.shape[-1])
             for i, acc in enumerate(class_acc):
-                if acc == 100.0:
+                if math.isnan(acc):
                     pass
                 else:
                     losses[f'idv_action_class_error_{i}'] = 100 - acc
@@ -422,7 +422,7 @@ def build(args):
         aux_loss=args.aux_loss,
     )
     matcher = build_matcher(args)
-    weight_dict = {'loss_action': args.action_loss_coef, 'loss_activity': args.activity_loss_coef, 'loss_grouping': args.grouping_loss_coef, 'loss_consistency': args.consistency_loss_coef}
+    weight_dict = {'idv_loss_action': args.action_loss_coef, 'grp_loss_activity': args.activity_loss_coef, 'loss_grouping': args.grouping_loss_coef, 'loss_consistency': args.consistency_loss_coef}
     if args.aux_loss:
         aux_weight_dict = {}
         for i in range(args.dec_layers - 1):
