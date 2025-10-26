@@ -14,6 +14,17 @@ import random
 import sys
 from pathlib import Path
 
+'''
+Reference:
+https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
+'''
+
+'''
+Action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
+Activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
+
+'''
+
 FRAMES_SIZE = {1: (480, 720), 2: (480, 720), 3: (480, 720), 4: (480, 720), 5: (480, 720),
                6: (480, 720), 7: (480, 720), 8:  (480, 720), 9:  (480, 720), 10: (480, 720),
                11: (480, 720), 12: (480, 720), 13: (480, 720), 14: (480, 720), 15: (450, 800),

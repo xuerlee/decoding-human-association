@@ -168,15 +168,15 @@ class SetCriterion(nn.Module):
 
         self.empty_weight = self.empty_weight.to(out_activity_logits.device)
         loss_ce = F.cross_entropy(out_activity_logits.transpose(1, 2), target_classes, weight=self.empty_weight)
-        losses = {'loss_activity': loss_ce}
+        losses = {'grp_loss_activity': loss_ce}
 
         if log:
-            losses['activity_class_error'] = 100 - accuracy(out_activity_logits[idx], target_classes_o)[0]  # 100 - accuracy
+            losses['grp_activity_class_error'] = 100 - accuracy(out_activity_logits[idx], target_classes_o)[0]  # 100 - accuracy
 
             class_acc = per_class_accuracy(out_activity_logits[idx], target_classes_o, num_classes=out_activity_logits.shape[-1])
             for i, acc in enumerate(class_acc):
                 if not math.isnan(acc):
-                    losses[f'activity_class_error_{i}'] = 100 - acc
+                    losses[f'grp_activity_class_error_{i}'] = 100 - acc
         return losses
 
     def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
@@ -191,14 +191,16 @@ class SetCriterion(nn.Module):
         src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
         # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
         loss_ce = F.cross_entropy(src_logits, tgt_action_ids, ignore_index=-1)  # ignore index instead of multiplying mask
-        losses = {'loss_action': loss_ce}
+        losses = {'idv_loss_action': loss_ce}
 
         if log:
-            losses['action_class_error'] = 100 - accuracy(src_logits, tgt_action_ids)[0]
+            losses['idv_action_class_error'] = 100 - accuracy(src_logits, tgt_action_ids)[0]
             class_acc = per_class_accuracy(src_logits, tgt_action_ids, num_classes=src_logits.shape[-1])
             for i, acc in enumerate(class_acc):
                 if not math.isnan(acc):
-                    losses[f'action_class_error_{i}'] = 100 - acc
+                    losses[f'idv_action_class_error_{i}'] = 100 - acc
+                else:
+                    losses[f'idv_action_class_error_{i}'] = 0
         return losses
 
     @torch.no_grad()
@@ -391,9 +393,13 @@ def build(args):
     # COCO has a max_obj_id of 90, so we pass `num_classes` to be 91.
     # As another example, for a dataset that has a single class with id 1,
     # you should pass `num_classes` to be 2 (max_obj_id + 1).
-    # FIXME: num class of volleyball
-    num_action_classes = 6 if args.feature_file != 'volleyball' else 9  # not sure
-    num_activity_classes = 6 if args.feature_file != 'volleyball' else 4  # not sure
+    # FIXME: num class of volleyball / JRDB / CAFE
+    if args.feature_file == 'collective':
+        num_action_classes = 6
+        num_activity_classes = 6
+    elif args.feature_file == 'volleyball':
+        num_action_classes = 9
+        num_activity_classes = 8
 
     device = torch.device(args.device)
 

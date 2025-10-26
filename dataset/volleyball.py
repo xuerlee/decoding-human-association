@@ -14,41 +14,26 @@ import random
 import sys
 from pathlib import Path
 
-"""
+'''
 Reference:
-https://github.com/cvlab-epfl/social-scene-understanding/blob/master/volleyball.py
-"""
+https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
+'''
 
-ACTIVITIES = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
-              'l_set', 'l-spike', 'l-pass', 'l_winpoint']
+'''
+Action_names: ['Waiting', 'Setting', 'Digging', 'Falling', 'Spiking', 'Blocking', 'Jumping', 'Moving', 'Standing']
+Activity_names: ['r_set', 'r_spike', 'r-pass', 'r_winpoint', 'l_set', 'l-spike', 'l-pass', 'l_winpoint']
+[Pass]: Players who are trying an underhand pass independently of whether or not they are successful.
+[Set]: Player who is doing an overhand pass and those who are going to spike the ball whether they are really trying or faking.
+[Spike]: Players who are spiking and blocking. 
+[Winpoint]: All players in the team that scores a point. This group activity is observed for a few seconds right after the score.
+'''
 
-NUM_ACTIVITIES = 8
-
-ACTIONS = ['blocking', 'digging', 'falling', 'jumping',
-           'moving', 'setting', 'spiking', 'standing',
-           'waiting']
-NUM_ACTIONS = 9
 
 def volleyball_path(img_root, ann_root):
-    # train_seqs = [str(i + 1) for i in range(32)]
-    # val_seqs = [str(i + 1) for i in range(32)]
-    # val_seqs = [str(i + 33) for i in range(12)]
-    # val_seqs = [str(44)]
-
-    # for testing code runing one seq
-    # train_seqs = [str(i + 1) for i in range(1)]
-    # val_seqs = [str(i + 1) for i in range(1)]
-
-    # random seqs
-    # all_seqs = [str(i + 1) for i in range(44)]
-    # random.shuffle(all_seqs)
-    # train_seqs = all_seqs[:32]
-    # val_seqs = all_seqs[32:]
-
     # DIN seqs
-    val_seqs = [5, 6, 7, 8, 9, 10, 11, 15, 16, 25, 28, 29]
-    val_seqs = [str(s) for s in val_seqs]
-    train_seqs = [str(s) for s in range(1, 45) if s not in val_seqs]
+    train_seqs = [1, 3, 6, 7, 10, 13, 15, 16, 18, 22, 23, 31, 32, 36, 38, 39, 40, 41, 42, 48, 50, 52, 53, 54,
+                       0, 2, 8, 12, 17, 19, 24, 26, 27, 28, 30, 33, 46, 49, 51]
+    val_seqs = [4, 5, 9, 11, 14, 20, 21, 25, 29, 34, 35, 37, 43, 44, 45, 47]
     # val_seqs = train_seqs
 
     train_seq_path = [img_root / ('seq' + train_seq.zfill(2)) for train_seq in train_seqs]
