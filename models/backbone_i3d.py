@@ -33,7 +33,10 @@ class BackboneI3D(nn.Module):
         self.i3d = i3d_noglobal(out_channel=hidden_dim)
         # self.i3d = i3d(out_channel=hidden_dim)
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1, sampling_ratio=-1)
-        self.bbox_fc = nn.Sequential(nn.Linear(hidden_dim*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
+        self.bbox_conv = nn.Sequential(
+            nn.Conv2d(hidden_dim, 64, kernel_size=1),
+            nn.ReLU(inplace=True))
+        self.bbox_fc = nn.Sequential(nn.Linear(64*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
 
     def forward(self, img, bbox, valid_areas_b, meta):
         B, _, C, H, W = img.shape  # img.shape: 2, 10, 3, 224, 224; batch size, num_frames, C, H, W
@@ -80,6 +83,7 @@ class BackboneI3D(nn.Module):
         # boxes_features = boxes_features.reshape(N+B, -1)
 
         # *******************************************
+        boxes_features = self.bbox_conv(boxes_features)
         boxes_features = boxes_features.reshape(N, -1)
         boxes_features = self.bbox_fc(boxes_features)
         boxes_features = boxes_features.reshape(N, self.hidden_dim).contiguous()  # since grouped bboxes by individuals instead of frames
