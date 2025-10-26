@@ -58,9 +58,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         optimizer.step()
 
         metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
-        # metric_logger.update(grp_activity_class_error=loss_dict_reduced['activity_class_error'])
+        # metric_logger.update(grp_activity_class_error=loss_dict_reduced['grp_activity_class_error'])
         # metric_logger.update(grp_activity_class_error=0)
-        metric_logger.update(idv_action_class_error=loss_dict_reduced['action_class_error'])
+        metric_logger.update(idv_action_class_error=loss_dict_reduced['idv_action_class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
         if writer is not None:
@@ -68,19 +68,19 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             writer.add_scalar('Loss/total', loss_value, global_step)
 
             for k, v in loss_dict_reduced_scaled.items():
-                if k.startswith('action_class_error_') or k.startswith('activity_class_error_'):
+                if k.startswith('idv_action_class_error_') or k.startswith('grp_activity_class_error_'):
                     writer.add_scalar(f'Loss_scaled/{k}', v, global_step)
                 else:
                     writer.add_scalar(f'Loss_scaled/{k}', v.item(), global_step)
 
             for k, v in loss_dict_reduced_unscaled.items():
-                if k.startswith('action_class_error_') or k.startswith('activity_class_error_'):
+                if k.startswith('idv_action_class_error_') or k.startswith('grp_activity_class_error_'):
                     writer.add_scalar(f'Loss_unscaled/{k}', v, global_step)
                 else:
                     writer.add_scalar(f'Loss_unscaled/{k}', v.item(), global_step)
 
-            # writer.add_scalar('Error/grp_activity_class_error', loss_dict_reduced['activity_class_error'], global_step)
-            writer.add_scalar('Error/idv_action_class_error', loss_dict_reduced['action_class_error'], global_step)
+            # writer.add_scalar('Error/grp_activity_class_error', loss_dict_reduced['grp_activity_class_error'], global_step)
+            writer.add_scalar('Error/idv_action_class_error', loss_dict_reduced['idv_action_class_error'], global_step)
             writer.add_scalar('LR', optimizer.param_groups[0]["lr"], global_step)
 
     # gather the stats from all processes
@@ -120,10 +120,10 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
                              **loss_dict_reduced_unscaled)
 
         # TODO: grouping error
-        # metric_logger.update(grp_activity_class_error=loss_dict_reduced['activity_class_error'])
-        metric_logger.update(idv_action_class_error=loss_dict_reduced['action_class_error'])
+        # metric_logger.update(grp_activity_class_error=loss_dict_reduced['grp_activity_class_error'])
+        metric_logger.update(idv_action_class_error=loss_dict_reduced['idv_action_class_error'])
         for k, v in loss_dict_reduced.items():
-            if k.startswith('action_class_error_') or k.startswith('activity_class_error_') and v is not None:
+            if k.startswith('idv_action_class_error_') or k.startswith('grp_activity_class_error_') and v is not None:
                 metric_logger.update(**{k: v})
 
         # for confusion matrix
