@@ -197,10 +197,11 @@ class SetCriterion(nn.Module):
             losses['idv_action_class_error'] = 100 - accuracy(src_logits, tgt_action_ids)[0]
             class_acc = per_class_accuracy(src_logits, tgt_action_ids, num_classes=src_logits.shape[-1])
             for i, acc in enumerate(class_acc):
-                if not math.isnan(acc):
-                    losses[f'idv_action_class_error_{i}'] = 100 - acc
-                else:
-                    losses[f'idv_action_class_error_{i}'] = 0
+                # if not math.isnan(acc):
+                #     losses[f'idv_action_class_error_{i}'] = 100 - acc
+                # else:
+                #     losses[f'idv_action_class_error_{i}'] = 0
+                losses[f'idv_action_class_error_{i}'] = 100 - acc
         return losses
 
     @torch.no_grad()
