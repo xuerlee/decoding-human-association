@@ -65,7 +65,7 @@ class DETR(nn.Module):
 
         src_b, mask_b = bboxes.decompose()  # B, n_max, 4
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
-        boxes_features, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
+        boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
         hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
         # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # without positional embeddings
 
@@ -86,7 +86,7 @@ class DETR(nn.Module):
         memory = memory.view(B, n_max, self.hidden_dim)
         memory = self.dropout(memory)
         mask = ~mask.view(B, n_max)
-        outputs_action_class_bac = self.action_class_embed_bac(boxes_features)
+        outputs_action_class_bac = self.action_class_embed_bac(boxes_features_ini)
         outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
         # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)

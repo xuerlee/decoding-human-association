@@ -74,17 +74,17 @@ class BackboneI3D(nn.Module):
         boxes_idx_flat.requires_grad = False
         roi_boxes.requires_grad = False
 
-        boxes_features = self.roi_align(action_fm,
+        boxes_features_ini = self.roi_align(action_fm,
                                         roi_boxes)  # N (number of individuals in all batch with T_o frames per frame(stack together)), D(channels 256), K, K(crop size)
 
         # FC (embeddings)
-        N = boxes_features.shape[0]  # number of inviduals
+        N = boxes_features_ini.shape[0]  # number of inviduals
         # boxes_features = torch.cat((boxes_features, global_fm), dim=0)  # only available when global fm is from mixed_5c
         # boxes_features = boxes_features.reshape(N+B, -1)
 
         # *******************************************
         # boxes_features = self.bbox_conv(boxes_features)
-        boxes_features = boxes_features.reshape(N, -1)
+        boxes_features = boxes_features_ini.reshape(N, -1)
         boxes_features = self.bbox_fc(boxes_features)
         boxes_features = boxes_features.reshape(N, self.hidden_dim).contiguous()  # since grouped bboxes by individuals instead of frames
         # ********************************************
@@ -105,7 +105,17 @@ class BackboneI3D(nn.Module):
         boxes_features_padding = boxes_features_padding.reshape(B, n_max, self.hidden_dim).contiguous()  # B, n_max, hidden_dim
         mask = mask.reshape(B, n_max)
         boxes_features_padding = boxes_features_padding.permute(1, 0, 2).contiguous()  # n_max, B, hidden_dim
-        return roi_boxes, boxes_features_padding, mask, n_max, n_per_frame, (FH, FW)
+
+        start = 0
+        boxes_features_ini_padding = torch.zeros((B * n_max, self.hidden_dim * self.crop_h * self.crop_w), device=boxes_features_ini.device)
+        for i, n in enumerate(n_per_frame):
+            boxes_features_ini_padding[i * n_max: i * n_max + n, :].copy_(boxes_features_ini[start: start + n, :])
+            start += n
+        boxes_features_ini_padding = boxes_features_ini_padding.reshape(B, n_max,
+                                                                self.hidden_dim * self.crop_h * self.crop_w).contiguous()  # B, n_max, hidden_dim*roi_w*roi_h
+        boxes_features_ini_padding = boxes_features_ini_padding.permute(1, 0, 2).contiguous()  # n_max, B, hidden_dim
+
+        return roi_boxes, boxes_features_padding, boxes_features_ini_padding, mask, n_max, n_per_frame, (FH, FW)
 
 class Joiner(nn.Sequential):
     def __init__(self, backbone, position_embedding):
@@ -113,7 +123,7 @@ class Joiner(nn.Sequential):
 
     def forward(self, fm, bbox, valid_areas_b, meta):
         # print(meta)
-        roi_boxes, boxes_features, mask, n_max, n_per_frame, featuremap_size = self[0](fm, bbox, valid_areas_b, meta)  # backbone
+        roi_boxes, boxes_features, boxes_features_ini, mask, n_max, n_per_frame, featuremap_size = self[0](fm, bbox, valid_areas_b, meta)  # backbone
 
         bbox_norm = roi_boxes.clone()
         start = 0
@@ -124,7 +134,7 @@ class Joiner(nn.Sequential):
         bbox_norm = bbox_norm[:, 1:]
         pos = self[1](bbox_norm, n_max, n_per_frame)
 
-        return boxes_features, pos, mask
+        return boxes_features, boxes_features_ini, pos, mask
 
 
 def build_backboneI3D(args):
