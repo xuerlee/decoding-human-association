@@ -17,11 +17,12 @@ import time
 
 class DETR(nn.Module):
     """ This is the DETR module that performs group recognition and actions classification"""
-    def __init__(self, backbone, transformer, feature_channels, num_action_classes, num_activity_classes, num_queries, aux_loss=False):
+    def __init__(self, backbone, transformer, roi_size, feature_channels, num_action_classes, num_activity_classes, num_queries, aux_loss=False):
         """ Initializes the model.
         Parameters:
             backbone: RoI Align features for individuals for each frame in one batch. See backbone.py
             transformer: torch module of the transformer architecture. See transformer.py
+            roi_size: size of roi aligned features
             feature_channels: number of feature channels output by the feature extraction part
             num_aciton_classes: number of individual action categories
             num_activity_classes: number of group activity categories
@@ -33,7 +34,9 @@ class DETR(nn.Module):
         self.num_queries = num_queries
         self.transformer = transformer
         self.hidden_dim = transformer.d_model
+        self.roi_size = roi_size
         # self.hidden_dim = 256*7*7
+        self.action_class_embed_bac = nn.Linear(self.hidden_dim * self.roi_size * self.roi_size, num_action_classes)
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
@@ -83,10 +86,11 @@ class DETR(nn.Module):
         memory = memory.view(B, n_max, self.hidden_dim)
         memory = self.dropout(memory)
         mask = ~mask.view(B, n_max)
+        outputs_action_class_bac = self.action_class_embed_bac(boxes_features)
         outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
         # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
-        action_scores = outputs_action_class
+        action_scores = outputs_action_class_bac + outputs_action_class
 
         # group activity classification
         hs = hs.view(-1, B, self.num_queries, self.hidden_dim)
@@ -415,6 +419,7 @@ def build(args):
     model = DETR(
         backbone,
         transformer,
+        roi_size=args.roi_size,
         feature_channels=args.feature_channels,
         num_action_classes=num_action_classes,
         num_activity_classes=num_activity_classes,
