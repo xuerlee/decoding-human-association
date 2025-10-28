@@ -84,8 +84,8 @@ class BackboneI3D(nn.Module):
 
         # *******************************************
         # boxes_features = self.bbox_conv(boxes_features)
-        boxes_features = boxes_features_ini.reshape(N, -1)
-        boxes_features = self.bbox_fc(boxes_features)
+        boxes_features_ini = boxes_features_ini.reshape(N, -1)  # N, hidden_dim*crop_w*crop_h
+        boxes_features = self.bbox_fc(boxes_features_ini)
         boxes_features = boxes_features.reshape(N, self.hidden_dim).contiguous()  # since grouped bboxes by individuals instead of frames
         # ********************************************
 
