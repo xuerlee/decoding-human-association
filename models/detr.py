@@ -36,7 +36,7 @@ class DETR(nn.Module):
         self.hidden_dim = transformer.d_model
         self.roi_size = roi_size
         # self.hidden_dim = 256*7*7
-        self.action_class_embed_bac = nn.Linear(self.hidden_dim * self.roi_size * self.roi_size, num_action_classes)
+        self.action_class_embed_bac = nn.Linear(self.hidden_dim * self.roi_size[0] * self.roi_size[1], num_action_classes)
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
@@ -419,7 +419,7 @@ def build(args):
     model = DETR(
         backbone,
         transformer,
-        roi_size=args.roi_size,
+        roi_size=args.roi_align,
         feature_channels=args.feature_channels,
         num_action_classes=num_action_classes,
         num_activity_classes=num_activity_classes,
