@@ -90,6 +90,7 @@ class DETR(nn.Module):
         outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
         # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        print(outputs_action_class_bac.shape, outputs_action_class.shape)
         action_scores = outputs_action_class_bac + outputs_action_class
 
         # group activity classification

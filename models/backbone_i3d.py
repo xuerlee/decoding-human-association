@@ -113,7 +113,6 @@ class BackboneI3D(nn.Module):
             start += n
         boxes_features_ini_padding = boxes_features_ini_padding.reshape(B, n_max,
                                                                 self.hidden_dim * self.crop_h * self.crop_w).contiguous()  # B, n_max, hidden_dim*roi_w*roi_h
-        boxes_features_ini_padding = boxes_features_ini_padding.permute(1, 0, 2).contiguous()  # n_max, B, hidden_dim
 
         return roi_boxes, boxes_features_padding, boxes_features_ini_padding, mask, n_max, n_per_frame, (FH, FW)
 
