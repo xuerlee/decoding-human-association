@@ -86,11 +86,14 @@ class DETR(nn.Module):
         memory = memory.view(B, n_max, self.hidden_dim)
         memory = self.dropout(memory)
         mask = ~mask.view(B, n_max)
+        boxes_features_ini = self.dropout(boxes_features_ini)
         outputs_action_class_bac = self.action_class_embed_bac(boxes_features_ini)
+        outputs_action_class_bac = self.dropout(outputs_action_class_bac)
         outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
         # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
-        action_scores = outputs_action_class_bac + outputs_action_class
+        # action_scores = outputs_action_class_bac + outputs_action_class
+        action_scores = outputs_action_class_bac
 
         # group activity classification
         hs = hs.view(-1, B, self.num_queries, self.hidden_dim)

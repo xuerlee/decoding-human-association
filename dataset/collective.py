@@ -56,23 +56,18 @@ def collective_path(img_root, ann_root):
     val_seqs = [str(s) for s in val_seqs]
     train_seqs = [str(s) for s in range(1, 45) if s not in val_seqs]
 
-    train_seq_path = [img_root / ('seq' + train_seq.zfill(2)) for train_seq in train_seqs]
-    val_seq_path = [img_root / ('seq' + val_seq.zfill(2)) for val_seq in val_seqs]
     train_ann_path = [ann_root / (train_seq + '_annotations.txt') for train_seq in train_seqs]
     val_ann_path = [ann_root / (val_seq + '_annotations.txt') for val_seq in val_seqs]
 
-    train_img_path = [file for seq in train_seq_path for file in seq.rglob("*")]
-    val_img_path = [file for seq in val_seq_path for file in seq.rglob("*")]  # find all folders and files inside
-
     PATHS = {
-        "train": (train_img_path, train_ann_path),
-        "val": (val_img_path, val_ann_path),
+        "train": train_ann_path,
+        "val": val_ann_path,
     }
 
-    train_img_file, train_ann_file = PATHS['train']
-    test_img_file, test_ann_file = PATHS['val']  # imgs and anns paths
+    train_ann_file = PATHS['train']
+    test_ann_file = PATHS['val']  # imgs and anns paths
 
-    return train_img_file, train_ann_file, test_img_file, test_ann_file
+    return train_ann_file, test_ann_file
 
 
 def collective_read_annotations(ann_file):

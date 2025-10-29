@@ -75,16 +75,22 @@ def get_args_parser():
                         help="Relative classification weight of the no-object classes (empty groups)")
 
     # feature map preparing & roi align
-    parser.add_argument('--feature_file', default='collective',
+    parser.add_argument('--feature_file',
+                        default='collective',
+                        # default='volleyball',
                         help='choose the dataset: collective or volleyball')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
     parser.add_argument('--feature_map_path',
                         default='/home/jiqqi/data/new-new-collective/img_for_fm_fm', type=str)
     parser.add_argument('--img_path',
-                        default='/home/jiqqi/data/new-new-collective/ActivityDataset', type=str)
+                        default='/home/jiqqi/data/new-new-collective/ActivityDataset',
+                        # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
+                        type=str)
     parser.add_argument('--ann_path',
-                        default='/home/jiqqi/data/social_CAD/anns', type=str)
+                        default='/home/jiqqi/data/social_CAD/anns',
+                        # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
+                        type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
     parser.add_argument('--img_w', default=224, type=int,
