@@ -29,14 +29,13 @@ class BackboneI3D(nn.Module):
         self.crop_h = crop_h
         self.crop_w = crop_w
         self.hidden_dim = hidden_dim
-        # self.hidden_dim = 256*7*7
         self.i3d = i3d_noglobal(out_channel=hidden_dim)
         # self.i3d = i3d(out_channel=hidden_dim)
         self.roi_align = RoIAlign(output_size=(crop_h, crop_w), spatial_scale=1, sampling_ratio=-1)
         # self.bbox_conv = nn.Sequential(
         #     nn.Conv2d(hidden_dim, 64, kernel_size=1),
         #     nn.ReLU(inplace=True))
-        self.bbox_fc = nn.Sequential(nn.Linear(hidden_dim*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
+        # self.bbox_fc = nn.Sequential(nn.Linear(hidden_dim*crop_h*crop_w, 1024), nn.Linear(1024, hidden_dim))
 
     def forward(self, img, bbox, valid_areas_b, meta):
         B, _, C, H, W = img.shape  # img.shape: 2, 10, 3, 224, 224; batch size, num_frames, C, H, W
@@ -85,8 +84,8 @@ class BackboneI3D(nn.Module):
         # *******************************************
         # boxes_features = self.bbox_conv(boxes_features)
         boxes_features_ini = boxes_features_ini.reshape(N, -1)  # N, hidden_dim*crop_w*crop_h
-        boxes_features = self.bbox_fc(boxes_features_ini)
-        boxes_features = boxes_features.reshape(N, self.hidden_dim).contiguous()  # since grouped bboxes by individuals instead of frames
+        # boxes_features = self.bbox_fc(boxes_features_ini)
+        # boxes_features = boxes_features.reshape(N, self.hidden_dim).contiguous()  # since grouped bboxes by individuals instead of frames
         # ********************************************
 
         # if add global features ()
@@ -95,16 +94,16 @@ class BackboneI3D(nn.Module):
         # boxes_features = torch.cat((boxes_features, global_features), dim=0)
 
         # padding and mask again
-        start = 0
-        boxes_features_padding = torch.zeros((B*n_max, self.hidden_dim), device=boxes_features.device)
-        mask = torch.ones((B, n_max), dtype=torch.bool, device=boxes_features.device)
-        for i, n in enumerate(n_per_frame):
-            boxes_features_padding[i*n_max: i*n_max+n, :].copy_(boxes_features[start: start+n, :])
-            mask[i, :n] = False
-            start += n
-        boxes_features_padding = boxes_features_padding.reshape(B, n_max, self.hidden_dim).contiguous()  # B, n_max, hidden_dim
-        mask = mask.reshape(B, n_max)
-        boxes_features_padding = boxes_features_padding.permute(1, 0, 2).contiguous()  # n_max, B, hidden_dim
+        # start = 0
+        # boxes_features_padding = torch.zeros((B*n_max, self.hidden_dim), device=boxes_features.device)
+        # mask = torch.ones((B, n_max), dtype=torch.bool, device=boxes_features.device)
+        # for i, n in enumerate(n_per_frame):
+        #     boxes_features_padding[i*n_max: i*n_max+n, :].copy_(boxes_features[start: start+n, :])
+        #     mask[i, :n] = False
+        #     start += n
+        # boxes_features_padding = boxes_features_padding.reshape(B, n_max, self.hidden_dim).contiguous()  # B, n_max, hidden_dim
+        # mask = mask.reshape(B, n_max)
+        # boxes_features_padding = boxes_features_padding.permute(1, 0, 2).contiguous()  # n_max, B, hidden_dim
 
         start = 0
         boxes_features_ini_padding = torch.zeros((B * n_max, self.hidden_dim * self.crop_h * self.crop_w), device=boxes_features_ini.device)
@@ -114,7 +113,8 @@ class BackboneI3D(nn.Module):
         boxes_features_ini_padding = boxes_features_ini_padding.reshape(B, n_max,
                                                                 self.hidden_dim * self.crop_h * self.crop_w).contiguous()  # B, n_max, hidden_dim*roi_w*roi_h
 
-        return roi_boxes, boxes_features_padding, boxes_features_ini_padding, mask, n_max, n_per_frame, (FH, FW)
+        # return roi_boxes, boxes_features_padding, boxes_features_ini_padding, mask, n_max, n_per_frame, (FH, FW)
+        return roi_boxes, boxes_features_ini_padding, n_max, n_per_frame, (FH, FW)
 
 class Joiner(nn.Sequential):
     def __init__(self, backbone, position_embedding):
@@ -122,7 +122,8 @@ class Joiner(nn.Sequential):
 
     def forward(self, fm, bbox, valid_areas_b, meta):
         # print(meta)
-        roi_boxes, boxes_features, boxes_features_ini, mask, n_max, n_per_frame, featuremap_size = self[0](fm, bbox, valid_areas_b, meta)  # backbone
+        # roi_boxes, boxes_features, boxes_features_ini, mask, n_max, n_per_frame, featuremap_size = self[0](fm, bbox, valid_areas_b, meta)  # backbone
+        roi_boxes, boxes_features_ini, n_max, n_per_frame, featuremap_size = self[0](fm, bbox, valid_areas_b, meta)  # backbone
 
         bbox_norm = roi_boxes.clone()
         start = 0
@@ -133,7 +134,8 @@ class Joiner(nn.Sequential):
         bbox_norm = bbox_norm[:, 1:]
         pos = self[1](bbox_norm, n_max, n_per_frame)
 
-        return boxes_features, boxes_features_ini, pos, mask
+        # return boxes_features, boxes_features_ini, pos, mask
+        return boxes_features_ini, pos
 
 
 def build_backboneI3D(args):
