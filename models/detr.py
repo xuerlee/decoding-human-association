@@ -32,14 +32,14 @@ class DETR(nn.Module):
         """
         super().__init__()
         self.num_queries = num_queries
-        # self.transformer = transformer
+        self.transformer = transformer
         self.hidden_dim = transformer.d_model
         self.roi_size = roi_size
         self.action_class_embed_bac = nn.Linear(self.hidden_dim * self.roi_size[0] * self.roi_size[1], num_action_classes)
-        # self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
-        # self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
-        # self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
-        # self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
+        self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
+        self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
+        self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
+        self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
         self.dropout = nn.Dropout(p=0.1)  # set zeros randomly, no influences on valid mask
         self.backbone = backbone
         self.aux_loss = aux_loss
@@ -64,52 +64,51 @@ class DETR(nn.Module):
 
         src_b, mask_b = bboxes.decompose()  # B, n_max, 4
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
-        # boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
-        boxes_features, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
-        # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
-        # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # without positional embeddings
+        boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
+        hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
+       #  hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # without positional embeddings
 
         # only individual action (for debug)
-        B = src_f.shape[0]
-        n_max = src_b.shape[1]
-        mask = ~mask.view(B, n_max)
-        boxes_features = self.dropout(boxes_features)
-        outputs_action_class = self.action_class_embed_bac(boxes_features)  # B, n_max, num_action_classes
-        outputs_action_class = self.dropout(outputs_action_class)
-        outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
-        action_scores = outputs_action_class
-        out = {'pred_action_logits': action_scores}
-
-        # # individual action classfication
         # B = src_f.shape[0]
         # n_max = src_b.shape[1]
-        # memory = memory.view(B, n_max, self.hidden_dim)
-        # memory = self.dropout(memory)
         # mask = ~mask.view(B, n_max)
-        # boxes_features_ini = self.dropout(boxes_features_ini)
-        # outputs_action_class_bac = self.action_class_embed_bac(boxes_features_ini)
-        # outputs_action_class_bac = self.dropout(outputs_action_class_bac)
-        # outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classes
+        # boxes_features = self.dropout(boxes_features)
+        # outputs_action_class = self.action_class_embed_bac(boxes_features)  # B, n_max, num_action_classes
         # outputs_action_class = self.dropout(outputs_action_class)
-        # # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
-        # # action_scores = outputs_action_class_bac + outputs_action_class
-        # action_scores = outputs_action_class_bac
-        #
-        # # group activity classification
-        # hs = hs.view(-1, B, self.num_queries, self.hidden_dim)
-        # outputs_activity_class = self.activity_class_embed(hs)  # num_dec_layers, B, num_queries, num_activity_classes
-        # activity_scores = outputs_activity_class
-        #
-        # # for grouping based on attention weights
-        # attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
-        # attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
-        # # attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
-        # # attention_weights = attention_weights * mask.unsqueeze(-1)  # B, n_max, num_queries
-        #
-        # out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
-        #
-        # if self.aux_loss:
-        #     out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
+        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        # action_scores = outputs_action_class
+        # out = {'pred_action_logits': action_scores}
+
+        # individual action classfication
+        B = src_f.shape[0]
+        n_max = src_b.shape[1]
+        memory = memory.view(B, n_max, self.hidden_dim)
+        memory = self.dropout(memory)
+        mask = ~mask.view(B, n_max)
+        boxes_features_ini = self.dropout(boxes_features_ini)
+        outputs_action_class_bac = self.action_class_embed_bac(boxes_features_ini)
+        outputs_action_class_bac = self.dropout(outputs_action_class_bac)
+        outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classes
+        outputs_action_class = self.dropout(outputs_action_class)
+        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        # action_scores = outputs_action_class_bac + outputs_action_class
+        action_scores = outputs_action_class_bac
+
+        # group activity classification
+        hs = hs.view(-1, B, self.num_queries, self.hidden_dim)
+        outputs_activity_class = self.activity_class_embed(hs)  # num_dec_layers, B, num_queries, num_activity_classes
+        activity_scores = outputs_activity_class
+
+        # for grouping based on attention weights
+        attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
+        attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
+        # attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
+        # attention_weights = attention_weights * mask.unsqueeze(-1)  # B, n_max, num_queries
+
+        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
+
+        if self.aux_loss:
+            out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
 
         return out
 
@@ -186,8 +185,7 @@ class SetCriterion(nn.Module):
                     losses[f'grp_activity_class_error_{i}'] = 100 - acc
         return losses
 
-    # def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
-    def loss_action_labels(self, outputs, targets, log=True):
+    def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
         """individual action lassification loss (NLL)
         targets dicts must contain the key "pred_action_logits" containing a tensor of dim [nb_target_boxes]
         """
@@ -198,8 +196,7 @@ class SetCriterion(nn.Module):
         tgt_action_ids = tgt_action_ids[idx]  # n_persons in B
         src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
         # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
-        # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, ignore_index=-1)  # ignore index instead of multiplying mask
-        loss_ce = F.cross_entropy(src_logits, tgt_action_ids)  # ignore index instead of multiplying mask
+        loss_ce = F.cross_entropy(src_logits, tgt_action_ids, ignore_index=-1)  # ignore index instead of multiplying mask
         losses = {'idv_loss_action': loss_ce}
 
         if log:
@@ -326,8 +323,7 @@ class SetCriterion(nn.Module):
             pass
         return mask
 
-    # def get_loss(self, loss, outputs, targets, indices, num_groups, **kwargs):
-    def get_loss(self, loss, outputs, targets, **kwargs):
+    def get_loss(self, loss, outputs, targets, indices, num_groups, **kwargs):
         loss_map = {
             'activity': self.loss_activity_labels,
             'action': self.loss_action_labels,
@@ -336,8 +332,7 @@ class SetCriterion(nn.Module):
             'consistency': self.loss_action_group_consistency,
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
-        # return loss_map[loss](outputs, targets, indices, num_groups, **kwargs)
-        return loss_map[loss](outputs, targets, **kwargs)
+        return loss_map[loss](outputs, targets, indices, num_groups, **kwargs)
 
     def forward(self, outputs, targets):
         """ This performs the loss computation.
@@ -350,22 +345,22 @@ class SetCriterion(nn.Module):
                       groups in the target) containing the group activity class labels
                       one-hot matrices: Tensor of dim [num_persons, num_target_groups] indicating the target grouping arrangement
         """
-        # outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs' and k != 'pred_action_logits'}
-        #
-        # # Retrieve the matching between the outputs of the last layer and the targets
-        # indices = self.matcher(outputs_without_aux, targets[1:])  # src id, tgt id
-        # # Compute the average number of target groups accross all nodes, for normalization purposes
-        # num_groups = (targets[1].decompose()[0] != -1).sum()
-        # num_groups = torch.as_tensor([num_groups], dtype=torch.float, device=next(iter(outputs.values())).device)
-        # if is_dist_avail_and_initialized():
-        #     torch.distributed.all_reduce(num_groups)
-        # num_groups = torch.clamp(num_groups / get_world_size(), min=1).item()  # every gpu has at least on positive sample
+        outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs' and k != 'pred_action_logits'}
+
+        # Retrieve the matching between the outputs of the last layer and the targets
+        indices = self.matcher(outputs_without_aux, targets[1:])  # src id, tgt id
+        # Compute the average number of target groups accross all nodes, for normalization purposes
+        num_groups = (targets[1].decompose()[0] != -1).sum()
+        num_groups = torch.as_tensor([num_groups], dtype=torch.float, device=next(iter(outputs.values())).device)
+        if is_dist_avail_and_initialized():
+            torch.distributed.all_reduce(num_groups)
+        num_groups = torch.clamp(num_groups / get_world_size(), min=1).item()  # every gpu has at least on positive sample
 
         # Compute all the requested losses
         losses = {}
         for loss in self.losses:
-            # losses.update(self.get_loss(loss, outputs, targets, indices, num_groups))
-            losses.update(self.get_loss(loss, outputs, targets))
+            losses.update(self.get_loss(loss, outputs, targets, indices, num_groups))
+
 
         # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
         # if 'aux_outputs' in outputs:
