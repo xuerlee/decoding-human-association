@@ -65,7 +65,7 @@ class DETR(nn.Module):
         src_b, mask_b = bboxes.decompose()  # B, n_max, 4
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
         # boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
-        boxes_features, pos = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
+        boxes_features, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
         # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
         # hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # without positional embeddings
 
@@ -75,7 +75,7 @@ class DETR(nn.Module):
         boxes_features = self.dropout(boxes_features)
         outputs_action_class = self.action_class_embed_bac(boxes_features)  # B, n_max, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
-        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
+        outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
         action_scores = outputs_action_class
         out = {'pred_action_logits': action_scores}
 
@@ -197,7 +197,8 @@ class SetCriterion(nn.Module):
         tgt_action_ids = tgt_action_ids[idx]  # n_persons in B
         src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
         # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
-        loss_ce = F.cross_entropy(src_logits, tgt_action_ids, ignore_index=-1)  # ignore index instead of multiplying mask
+        # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, ignore_index=-1)  # ignore index instead of multiplying mask
+        loss_ce = F.cross_entropy(src_logits, tgt_action_ids)  # ignore index instead of multiplying mask
         losses = {'idv_loss_action': loss_ce}
 
         if log:
