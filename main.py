@@ -159,13 +159,13 @@ def main(args):
 
     param_dicts = {"params": [p for n, p in model_without_ddp.named_parameters() if p.requires_grad]},
 
-    # optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
-    #                               weight_decay=args.weight_decay)
-    # # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
-    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_drop, gamma=0.1)
+    optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
+                                  weight_decay=args.weight_decay)
+    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_drop, gamma=0.1)
 
-    optimizer = torch.optim.SGD(param_dicts, lr=args.lr, momentum=0.9, weight_decay=0.0000001)
-    lr_scheduler= torch.optim.lr_scheduler.MultiStepLR(optimizer, args.lr_drop)
+    # optimizer = torch.optim.SGD(param_dicts, lr=args.lr, momentum=0.9, weight_decay=0.0000001)
+    # lr_scheduler= torch.optim.lr_scheduler.MultiStepLR(optimizer, args.lr_drop)
 
 
     if args.input_format == 'feature':
