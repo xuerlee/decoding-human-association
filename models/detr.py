@@ -72,6 +72,7 @@ class DETR(nn.Module):
         # only individual action (for debug)
         B = src_f.shape[0]
         n_max = src_b.shape[1]
+        mask = ~mask.view(B, n_max)
         boxes_features = self.dropout(boxes_features)
         outputs_action_class = self.action_class_embed_bac(boxes_features)  # B, n_max, num_action_classes
         outputs_action_class = self.dropout(outputs_action_class)
