@@ -160,7 +160,7 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
                     for t, t_group in enumerate(oh.T):
                         if torch.equal(p_group, t_group):
                             if pred_activity[p] == activity_gts[i, t]:
-                                n_persons = pred_activity[p].sum()
+                                n_persons = p_group.sum()
                                 correct_social += n_persons
                 overall_social += oh.size(0)
 
