@@ -43,7 +43,7 @@ def get_args_parser():
                         help="Number of decoding layers in the transformer")
     parser.add_argument('--dim_feedforward', default=2048, type=int,
                         help="Intermediate size of the feedforward layers in the transformer blocks")
-    parser.add_argument('--hidden_dim', default=512, type=int,
+    parser.add_argument('--hidden_dim', default=256, type=int,
                         help="Size of the embeddings (dimension of the transformer)")
     parser.add_argument('--dropout', default=0.1, type=float,
                         help="Dropout applied in the transformer")
@@ -110,12 +110,12 @@ def get_args_parser():
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
-                        default='',
-                        # default='output_dir/i3d/i3d_action_4f_notransformer/checkpoint0299.pth',
+                        # default='',
+                        default='output_dir/restartall_hidden256_enc2dec2_groupinglossBCEweights_activityBCEcost_validmask_adamw2/checkpoint0149.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--eval', default=False, action='store_true')
+    parser.add_argument('--eval', default=True, action='store_true')
     parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters

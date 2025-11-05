@@ -96,6 +96,8 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
 
     all_action_preds = []
     all_action_gts = []
+    correct_social = 0
+    overall_social = 0
 
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
@@ -127,21 +129,52 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
                 metric_logger.update(**{k: v})
 
         # for final evaluation
-        pred_action_logits = outputs['pred_action_logits']
-        action_gts = targets[1].decompose()[0].cpu().numpy()
-        valid_mask = (action_gts != -1)
-        for i, pred_action_logit in enumerate(pred_action_logits):
-            pred_action_logit = pred_action_logits[i][valid_mask[i]]
-            pred_action = pred_action_logit.argmax(dim=-1).cpu().numpy()
-            all_action_preds.extend(pred_action)
-            action_gt = action_gts[i][~(action_gts[i] == -1)]
-            all_action_gts.extend(action_gt)
-    overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
-    overall_idv_action_error = 100 - overall_idv_action_acc * 100
-    print('overall_idv_action_error: ', overall_idv_action_error)
+        if if_confuse:
+            pred_action_logits = outputs['pred_action_logits']
+            action_gts = targets[1].decompose()[0].cpu().numpy()
+            valid_mask = (action_gts != -1)
+            for i, pred_action_logit in enumerate(pred_action_logits):
+                pred_action_logit = pred_action_logits[i][valid_mask[i]]
+                pred_action = pred_action_logit.argmax(dim=-1).cpu().numpy()
+                all_action_preds.extend(pred_action)
+                action_gt = action_gts[i][~(action_gts[i] == -1)]
+                all_action_gts.extend(action_gt)
 
-    # for confusion matrix
+            attention_weights = outputs['attention_weights']
+            one_hot_gts = targets[3].decompose()[0]
+            one_hot_masks = ~targets[3].decompose()[1]
+            pred_activity_logits = outputs['pred_activity_logits']
+            activity_gts = targets[2].decompose()[0]
+            for i, oh in enumerate(one_hot_gts):
+                row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
+                oh = oh[row_mask]
+                mask_valid = one_hot_masks[i][row_mask]
+                oh = oh[:, mask_valid[0]]
+                for j, aw in enumerate(attention_weights):
+                    aw = aw[valid_mask[i]]
+                    group_ids_person = aw.argmax(dim=-1)
+                    pred_group = torch.zeros_like(aw)
+                    for a, b in enumerate(group_ids_person):
+                        pred_group[a, b] = 1
+                    pred_activity = pred_activity_logits[j].argmax(dim=-1)
+                    unique_groups = torch.unique(group_ids_person)
+                    pred_activity = pred_activity[unique_groups]
+                    for p, p_group in enumerate(pred_group.T):
+                        for t, t_group in enumerate(oh.T):
+                            if p_group == t_group:
+                                if pred_activity[p] == activity_gts[i, t]:
+                                    correct_social += 1
+                overall_social += oh.size(1)
+
+
+    # final evaluation
     if if_confuse:
+        overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
+        overall_idv_action_error = 100 - overall_idv_action_acc * 100
+        print('overall_idv_action_error: ', overall_idv_action_error)
+        print('social accuracy: ', correct_social / overall_social)
+
+        # confusion matrix
         utils.plot_confusion_matrix(all_action_gts, all_action_preds, save_path, class_names=action_names)
 
     # gather the stats from all processes
