@@ -161,7 +161,7 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
                     pred_activity = pred_activity[unique_groups]
                     for p, p_group in enumerate(pred_group.T):
                         for t, t_group in enumerate(oh.T):
-                            if p_group == t_group:
+                            if torch.equal(p_group, t_group):
                                 if pred_activity[p] == activity_gts[i, t]:
                                     correct_social += 1
                 overall_social += oh.size(1)
