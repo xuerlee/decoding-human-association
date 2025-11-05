@@ -157,8 +157,6 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
                     for a, b in enumerate(group_ids_person):
                         pred_group[a, b] = 1
                     pred_activity = pred_activity_logits[j].argmax(dim=-1)
-                    unique_groups = torch.unique(group_ids_person)
-                    pred_activity = pred_activity[unique_groups]
                     for p, p_group in enumerate(pred_group.T):
                         for t, t_group in enumerate(oh.T):
                             if torch.equal(p_group, t_group):
