@@ -160,8 +160,9 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
                     for t, t_group in enumerate(oh.T):
                         if torch.equal(p_group, t_group):
                             if pred_activity[p] == activity_gts[i, t]:
-                                correct_social += 1
-                overall_social += oh.size(1)
+                                n_persons = pred_activity[p].sum()
+                                correct_social += n_persons
+                overall_social += oh.size(0)
 
 
     # final evaluation
@@ -169,7 +170,7 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
         overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
         overall_idv_action_error = 100 - overall_idv_action_acc * 100
         print('overall_idv_action_error: ', overall_idv_action_error)
-        print('social accuracy: ', correct_social / overall_social)
+        print('social accuracy: ', 100 * (correct_social / overall_social))
 
         # confusion matrix
         utils.plot_confusion_matrix(all_action_gts, all_action_preds, save_path, class_names=action_names)
