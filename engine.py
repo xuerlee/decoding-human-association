@@ -136,7 +136,7 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
             all_action_preds.extend(pred_action)
             action_gt = action_gts[i][~(action_gts[i] == -1)]
             all_action_gts.extend(action_gt)
-    overall_idv_action_acc = (all_action_preds == all_action_gts).float().mean()
+    overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
     overall_idv_action_error = 100 - overall_idv_action_acc * 100
     print('overall_idv_action_error: ', overall_idv_action_error)
 
