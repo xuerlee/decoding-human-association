@@ -150,18 +150,17 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
                 oh = oh[row_mask]
                 mask_valid = one_hot_masks[i][row_mask]
                 oh = oh[:, mask_valid[0]]
-                for j, aw in enumerate(attention_weights):
-                    aw = aw[valid_mask[i]]
-                    group_ids_person = aw.argmax(dim=-1)
-                    pred_group = torch.zeros_like(aw)
-                    for a, b in enumerate(group_ids_person):
-                        pred_group[a, b] = 1
-                    pred_activity = pred_activity_logits[j].argmax(dim=-1)
-                    for p, p_group in enumerate(pred_group.T):
-                        for t, t_group in enumerate(oh.T):
-                            if torch.equal(p_group, t_group):
-                                if pred_activity[p] == activity_gts[i, t]:
-                                    correct_social += 1
+                aw = attention_weights[i][valid_mask[i]]
+                group_ids_person = aw.argmax(dim=-1)
+                pred_group = torch.zeros_like(aw)
+                for a, b in enumerate(group_ids_person):
+                    pred_group[a, b] = 1
+                pred_activity = pred_activity_logits[i].argmax(dim=-1)
+                for p, p_group in enumerate(pred_group.T):
+                    for t, t_group in enumerate(oh.T):
+                        if torch.equal(p_group, t_group):
+                            if pred_activity[p] == activity_gts[i, t]:
+                                correct_social += 1
                 overall_social += oh.size(1)
 
 
