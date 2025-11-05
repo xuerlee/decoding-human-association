@@ -27,6 +27,7 @@ class DistinctColorGenerator:
         self.index += 1
         return (int(b * 255), int(g * 255), int(r * 255))  # BGR for OpenCV
 
+
 def load_key_img(img_folder_path, meta):
     key_imgs = []
     sids = []
@@ -41,6 +42,8 @@ def load_key_img(img_folder_path, meta):
         sids.append(sid)
         fids.append(fid)
     return key_imgs, sids, fids
+
+
 def merge_group_bboxes(bboxes: torch.Tensor, group_ids: torch.Tensor):
     group_bboxes = []
     unique_groups = torch.unique(group_ids)
@@ -111,23 +114,30 @@ def draw_bboxes_action_compare(img, bboxes, action_labels, action_gts):
 
     return img_copy
 
-def draw_bboxes_compare(img, bboxes, action_labels, action_gts, group_bboxes, person_ids, activity_labels):
+
+def draw_bboxes_gt(img, bboxes, action_labels, group_bboxes, person_ids, activity_labels):
     color_gen = DistinctColorGenerator()
     img_copy = img.copy()
     if isinstance(bboxes, torch.Tensor):
         bboxes = bboxes.cpu().numpy()
+    if isinstance(person_ids, torch.Tensor):
+        person_ids = person_ids.cpu().numpy()
 
-    for i, bbox in enumerate(bboxes):
-        x1, y1, x2, y2 = map(int, bbox)
+    for i, group_bbox in enumerate(group_bboxes):
+        x1, y1, x2, y2 = map(int, group_bbox)
         color = color_gen.next()
-        cv2.rectangle(img_copy, (x1, y1), (x2, y2), color, thickness=2)
+        cv2.rectangle(img_copy, (x1-17, y1-17), (x2+17, y2+17), color, thickness=2)
+        activity_label = activity_names[activity_labels[i]]
+        cv2.putText(img_copy, activity_label, (x1, y1 - 22), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, color, 1, cv2.LINE_AA)
 
-        action_label = action_names[action_labels[i]]
-        cv2.putText(img_copy, action_label, (x1, y1), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, color, 1, cv2.LINE_AA)
+        person_id = person_ids[i]
 
-        action_gt = action_names[action_gts[i]]
-        cv2.putText(img_copy, action_gt, (x1, y1 - 15), cv2.FONT_HERSHEY_SIMPLEX,
+        for pid in person_id:
+            x1, y1, x2, y2 = map(int, bboxes[pid])
+            cv2.rectangle(img_copy, (x1, y1), (x2, y2), color, 2)
+            action_label = action_names[action_labels[pid]]
+            cv2.putText(img_copy, action_label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, color, 1, cv2.LINE_AA)
 
     return img_copy
@@ -149,7 +159,33 @@ def visualization(model, criterion, data_loader, device, args):
         key_imgs, sids, fids = load_key_img(img_folder_path, meta)  # numpy
         bboxes = targets[0].decompose()[0]
         action_gts = targets[1].decompose()[0]
-        mask = ~targets[1].decompose()[1]
+        mask_action = ~targets[1].decompose()[1]
+        activity_gts = targets[2].decompose()[0]
+        mask_activity = ~targets[2].decompose()[1]
+        one_hot_gts = targets[3].decompose()[0]
+        mask_one_hot = ~targets[3].decompose()[1]
+
+        group_bboxes_gt = []
+        person_ids_gt = []
+        activities_gt = []
+        for i, oh in enumerate(one_hot_gts):
+            row_mask = mask_one_hot[i].any(dim=1)  # valid raws, bool tensor
+            oh = oh[row_mask]
+            mask_valid = mask_one_hot[i][row_mask]
+            oh = oh[:, mask_valid[0]]
+
+            group_ids_person = oh.argmax(dim=-1)
+            bbox = bboxes[i][mask_action[i]]
+            group_bbox, person_id = merge_group_bboxes(bbox, group_ids_person)
+            group_bboxes_gt.append(group_bbox)
+            person_ids_gt.append(person_id)
+
+            activity_gt = activity_gts[i][mask_activity[i]]
+            unique_groups = torch.unique(group_ids_person)
+            valid_activity_label = activity_gt[unique_groups]
+            activities_gt.append(valid_activity_label)
+
+
         outputs = model(samples, targets[0], meta)
 
         pred_action_logits = outputs['pred_action_logits']
@@ -160,15 +196,14 @@ def visualization(model, criterion, data_loader, device, args):
         person_ids = []
         valid_activity_labels = []
         for i, aw in enumerate(attention_weights):
-            aw = aw[mask[i]]
-            # aw = aw[~(aw == 0).all(dim=1)]
+            aw = aw[mask_action[i]]
             group_ids_person = aw.argmax(dim=-1)
-            bbox = bboxes[i][~(bboxes[i] == 0).all(dim=1)]
+            bbox = bboxes[i][mask_action[i]]
             group_bbox, person_id = merge_group_bboxes(bbox, group_ids_person)
             group_bboxes.append(group_bbox)
             person_ids.append(person_id)
 
-            pred_activity_logit = pred_activity_logits[i][~(pred_activity_logits[i] == 0).all(dim=1)]
+            pred_activity_logit = pred_activity_logits[i]
             activity_labels = pred_activity_logit.argmax(dim=-1)
             unique_groups = torch.unique(group_ids_person)
             valid_activity_label = activity_labels[unique_groups]
@@ -176,13 +211,20 @@ def visualization(model, criterion, data_loader, device, args):
 
         for i, key_img in enumerate(key_imgs):
             bbox = bboxes[i][~(bboxes[i] == 0).all(dim=1)]
-            # pred_action_logit = pred_action_logits[i][~(pred_action_logits[i] == 0).all(dim=1)]
-            pred_action_logit = pred_action_logits[i][mask[i]]
+            pred_action_logit = pred_action_logits[i][mask_action[i]]
             action_labels = pred_action_logit.argmax(dim=-1)
-            # img_with_bbox = draw_bboxes(key_img, bbox, action_labels, group_bboxes[i], person_ids[i], valid_activity_labels[i])
-            img_with_bbox = draw_bboxes_action_compare(key_img, bbox, action_labels, action_gts[i])
+
+            action_gt = action_gts[i][mask_action[i]]
+            activity_gt = activity_gts[i][mask_activity[i]]
+
+            img_with_bbox = draw_bboxes(key_img, bbox, action_labels, group_bboxes[i], person_ids[i], valid_activity_labels[i])
+            img_with_bbox_gt = draw_bboxes_gt(key_img, bbox, action_gt, group_bboxes_gt[i], person_ids_gt[i], activities_gt[i])
+            # img_with_bbox = draw_bboxes_action_compare(key_img, bbox, action_labels, action_gt)
+
             img_with_bbox = cv2.cvtColor(img_with_bbox, cv2.COLOR_RGB2BGR)
+            img_with_bbox_gt = cv2.cvtColor(img_with_bbox_gt, cv2.COLOR_RGB2BGR)
             # cv2.imshow(f'img_seq{sids[i]}_frame{fids[i]}', img_with_bbox)
             # cv2.waitKey(0)
             cv2.imwrite(output_dir+f'/img_seq{sids[i]}_frame{fids[i]}.jpg', img_with_bbox)
+            cv2.imwrite(output_dir+f'_gt/img_seq{sids[i]}_frame{fids[i]}.jpg', img_with_bbox_gt)
     return

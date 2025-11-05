@@ -29,9 +29,9 @@ def get_args_parser():
     parser.add_argument('--batch_size', default=2, type=int)
 
     # * Transformer
-    parser.add_argument('--enc_layers', default=6, type=int,
+    parser.add_argument('--enc_layers', default=2, type=int,
                         help="Number of encoding layers in the transformer")
-    parser.add_argument('--dec_layers', default=6, type=int,
+    parser.add_argument('--dec_layers', default=2, type=int,
                         help="Number of decoding layers in the transformer")
     parser.add_argument('--dim_feedforward', default=2048, type=int,
                         help="Intermediate size of the feedforward layers in the transformer blocks")
@@ -61,6 +61,8 @@ def get_args_parser():
                         help="Individual action consistence coefficient in the matching cost")
     parser.add_argument('--set_cost_bce', default=5, type=float,
                         help="BCE error between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
+    parser.add_argument('--set_cost_size', default=5, type=float,
+                        help="L1 cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
 
     # feature map preparing & roi align
     parser.add_argument('--feature_file', default='collective',
@@ -86,14 +88,14 @@ def get_args_parser():
     parser.add_argument('--roi_align', default=[7, 7], type=int,  # openpifpaf output
                         help='size of roi_align')
 
-    parser.add_argument('--output_dir', default='output_imgs/restartall_groupinglossBCEweights_activityBCEcost/test_action',
+    parser.add_argument('--output_dir', default='output_imgs/restartall_hidden256_enc2dec2_groupinglossBCEweights_activityBCEcost_validmask_adamw2/test',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
                         # default='',
-                        default='output_dir/restartall_groupinglossBCEweights_activityBCEcost/checkpoint0249.pth',
+                        default='output_dir/restartall_hidden256_enc2dec2_groupinglossBCEweights_activityBCEcost_validmask_adamw2/checkpoint0149.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -130,8 +132,6 @@ def main(args):
         model_without_ddp = model.module
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
-
-    dataset_train, dataset_val = build_fmset(args=args)
 
     if args.input_format == 'feature':
         dataset_train, dataset_val = build_fmset(args=args)
