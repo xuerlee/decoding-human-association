@@ -13,8 +13,38 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 
-action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
-activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
+# action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
+# activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
+
+action_names = ['blocking', 'digging', 'falling', 'jumping',
+                'moving', 'setting', 'spiking', 'standing',
+                'waiting']
+activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
+                  'l_set', 'l-spike', 'l-pass', 'l_winpoint']
+
+
+def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts):
+    correct_social = 0
+    overall_social = 0
+    for i, oh in enumerate(one_hot_gts):
+        row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
+        oh = oh[row_mask]
+        mask_valid = one_hot_masks[i][row_mask]
+        oh = oh[:, mask_valid[0]]
+        aw = attention_weights[i][valid_mask[i]]
+        group_ids_person = aw.argmax(dim=-1)
+        pred_group = torch.zeros_like(aw)
+        for a, b in enumerate(group_ids_person):
+            pred_group[a, b] = 1
+        pred_activity = pred_activity_logits[i].argmax(dim=-1)
+        for p, p_group in enumerate(pred_group.T):
+            for t, t_group in enumerate(oh.T):
+                if torch.equal(p_group, t_group):
+                    if pred_activity[p] == activity_gts[i, t]:
+                        # n_persons = p_group.sum()
+                        correct_social += 1
+        overall_social += oh.size(1)
+    return 100 * (correct_social / overall_social)
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -90,14 +120,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 
 @torch.no_grad()
-def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False):
+def evaluate(dataset, model, criterion, data_loader, device, save_path, if_confuse=False):
     model.eval()
     criterion.eval()
 
     all_action_preds = []
     all_action_gts = []
-    correct_social = 0
-    overall_social = 0
 
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
@@ -140,29 +168,13 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
                 action_gt = action_gts[i][~(action_gts[i] == -1)]
                 all_action_gts.extend(action_gt)
 
-            attention_weights = outputs['attention_weights']
-            one_hot_gts = targets[3].decompose()[0]
-            one_hot_masks = ~targets[3].decompose()[1]
-            pred_activity_logits = outputs['pred_activity_logits']
-            activity_gts = targets[2].decompose()[0]
-            for i, oh in enumerate(one_hot_gts):
-                row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
-                oh = oh[row_mask]
-                mask_valid = one_hot_masks[i][row_mask]
-                oh = oh[:, mask_valid[0]]
-                aw = attention_weights[i][valid_mask[i]]
-                group_ids_person = aw.argmax(dim=-1)
-                pred_group = torch.zeros_like(aw)
-                for a, b in enumerate(group_ids_person):
-                    pred_group[a, b] = 1
-                pred_activity = pred_activity_logits[i].argmax(dim=-1)
-                for p, p_group in enumerate(pred_group.T):
-                    for t, t_group in enumerate(oh.T):
-                        if torch.equal(p_group, t_group):
-                            if pred_activity[p] == activity_gts[i, t]:
-                                # n_persons = p_group.sum()
-                                correct_social += 1
-                overall_social += oh.size(1)
+            if dataset == 'collective':
+                attention_weights = outputs['attention_weights']
+                one_hot_gts = targets[3].decompose()[0]
+                one_hot_masks = ~targets[3].decompose()[1]
+                pred_activity_logits = outputs['pred_activity_logits']
+                activity_gts = targets[2].decompose()[0]
+                grouping_acc = grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts)
 
 
     # final evaluation
@@ -170,7 +182,8 @@ def evaluate(model, criterion, data_loader, device, save_path, if_confuse=False)
         overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
         overall_idv_action_error = 100 - overall_idv_action_acc * 100
         print('overall_idv_action_error: ', overall_idv_action_error)
-        print('social accuracy (group): ', 100 * (correct_social / overall_social))
+        if dataset == 'collective':
+            print('grouping accuracy: ', grouping_acc)
 
         # confusion matrix
         utils.plot_confusion_matrix(all_action_gts, all_action_preds, save_path, class_names=action_names)

@@ -18,7 +18,7 @@ def build(args):
     num_frames = args.num_frames
 
 
-    if args.feature_file == 'collective':
+    if args.dataset == 'collective':
         train_ann_file, test_ann_file = collective_path(img_root, ann_root)
 
         train_anns = collective_read_dataset(train_ann_file)  # ann dictionary
@@ -46,7 +46,7 @@ def build(args):
         test_dataset = Collective_Dataset(test_anns, test_frames, args.img_path, test_transform,
                                          num_frames=args.num_frames, is_training=args.is_training)
 
-    elif args.feature_file == 'volleyball':
+    elif args.dataset == 'volleyball':
         train_ann_file, test_ann_file = volleyball_path(img_root, ann_root)
 
         train_anns = volleyball_read_dataset(train_ann_file, args)  # ann dictionary

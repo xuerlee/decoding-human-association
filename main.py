@@ -75,21 +75,21 @@ def get_args_parser():
                         help="Relative classification weight of the no-object classes (empty groups)")
 
     # feature map preparing & roi align
-    parser.add_argument('--feature_file',
+    parser.add_argument('--dataset',
                         # default='collective',
                         default='volleyball',
-                        help='choose the dataset: collective or volleyball')
+                        help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
     parser.add_argument('--feature_map_path',
                         default='/home/jiqqi/data/new-new-collective/img_for_fm_fm', type=str)
     parser.add_argument('--img_path',
-                        default='/home/jiqqi/data/new-new-collective/ActivityDataset',
-                        # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
+                        # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
+                        default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
                         type=str)
     parser.add_argument('--ann_path',
-                        default='/home/jiqqi/data/social_CAD/anns',
-                        # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
+                        # default='/home/jiqqi/data/social_CAD/anns',
+                        default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
                         type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
@@ -115,7 +115,7 @@ def get_args_parser():
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--eval', default=True, action='store_true')
+    parser.add_argument('--eval', default=False, action='store_true')
     parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters
@@ -233,7 +233,7 @@ def main(args):
                         'args': args,
                     }, checkpoint_path)
 
-        test_stats = evaluate(
+        test_stats = evaluate(args.dataset,
             model, criterion, data_loader_val, device, save_path, if_confuse=False
         )
 

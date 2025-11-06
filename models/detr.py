@@ -401,12 +401,14 @@ def build(args):
     # As another example, for a dataset that has a single class with id 1,
     # you should pass `num_classes` to be 2 (max_obj_id + 1).
     # FIXME: num class of volleyball / JRDB / CAFE
-    if args.feature_file == 'collective':
+    if args.dataset == 'collective':
         num_action_classes = 6
         num_activity_classes = 6
-    elif args.feature_file == 'volleyball':
+    elif args.dataset == 'volleyball':
         num_action_classes = 9
         num_activity_classes = 8
+    else:
+        raise ValueError(f'import dataset {args.dataset} not supported, options: collective, volleyball, jrdb, cafe')
 
     device = torch.device(args.device)
 
@@ -441,7 +443,7 @@ def build(args):
     losses = ['activity', 'grouping', 'action', 'cardinality']
     # losses = ['activity', 'grouping', 'action']
     # losses = ['action']
-    criterion = SetCriterion(args.feature_file, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
+    criterion = SetCriterion(args.dataset, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
                              eos_coef=args.eos_coef, losses=losses)
     criterion.to(device)
     # postprocessors = {'bbox': PostProcess()}
