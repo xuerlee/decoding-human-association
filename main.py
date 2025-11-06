@@ -21,7 +21,7 @@ from featuremaps import build_fmset
 from dataset import build_dataset
 
 import util.misc as utils
-from engine import evaluate, train_one_epoch
+from engine import evaluate, train_one_epoch, train_one_epoch_accum_steps
 from models import build_model
 
 
@@ -30,6 +30,7 @@ def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--accum_steps', default=4, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=150, type=int)
     parser.add_argument('--lr_drop', default=[50, 100], nargs='+', type=int)
@@ -214,9 +215,14 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             sampler_train.set_epoch(epoch)
-        train_stats = train_one_epoch(
-            model, criterion, data_loader_train, optimizer, device, epoch, writer,
-            args.clip_max_norm)  # engine.py -- train_one_epoch
+        if args.dataset == 'volleyball':
+            train_stats = train_one_epoch_accum_steps(
+                model, criterion, data_loader_train, optimizer, device, epoch, writer, args.accum_steps,
+                args.clip_max_norm)  # engine.py -- train_one_epoch
+        else:
+            train_stats = train_one_epoch(
+                model, criterion, data_loader_train, optimizer, device, epoch, writer,
+                args.clip_max_norm)  # engine.py -- train_one_epoch
         lr_scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
