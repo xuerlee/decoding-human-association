@@ -49,7 +49,7 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
     overall_groups = 0
     correct_persons = 0
     correct_memberships = 0
-    overall_persons = 0
+    overall_persons = 1e-6
     for i, oh in enumerate(one_hot_gts):
         row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
         oh = oh[row_mask]
