@@ -10,7 +10,7 @@ import sys
 from typing import Iterable
 
 import torch
-
+from scipy.optimize import linear_sum_assignment
 import util.misc as utils
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,10 +25,31 @@ action_names = ['blocking', 'digging', 'falling', 'jumping',
 activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
 
+def matcher_eval(pred_group, oh):
+    # oh: n_persons, n_groups
+    # pred_group: n_persons, n_queries
+    n_group = oh.shape[1]
+    n_queries = pred_group.shape[1]
+    tgt = oh.T  # num_groups, n_persons
+    out = pred_group.T  # num_queries, n_persons
+    cost = torch.zeros(n_queries, n_group, device=out.device)
+    for i, out_query in enumerate(out):  # n_persons (can be regarded as cls) for certain query: multi cls classification for group
+        for j, tgt_group in enumerate(tgt):  # n_persons (can be regarded as cls) for certain group
+            inter = (out_query.bool() & tgt_group.bool()).sum()
+            union = (out_query.bool() | tgt_group.bool()).sum()
+            iou = inter / (union + 1e-6)
+            cost[i][j] = 1 - iou
+    cost = cost.cpu().numpy()
+    indices = linear_sum_assignment(cost)
+    return indices  # (out id, tgt id)
+
 
 def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts):
-    correct_social = 0
-    overall_social = 0
+    correct_groups = 0
+    overall_groups = 0
+    correct_persons = 0
+    correct_memberships = 0
+    overall_persons = 0
     for i, oh in enumerate(one_hot_gts):
         row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
         oh = oh[row_mask]
@@ -40,14 +61,27 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
         for a, b in enumerate(group_ids_person):
             pred_group[a, b] = 1
         pred_activity = pred_activity_logits[i].argmax(dim=-1)
+
+        indices = matcher_eval(pred_group, oh)
+        for out_id, tgt_id in indices:
+            correct_person = (oh[out_id].bool() & pred_group[tgt_id].bool()).sum()
+            correct_memberships += correct_person
+            if pred_activity[out_id] == activity_gts[i, tgt_id]:
+                correct_persons += correct_person
+        overall_persons += oh.size(0)
+
         for p, p_group in enumerate(pred_group.T):
             for t, t_group in enumerate(oh.T):
                 if torch.equal(p_group, t_group):
                     if pred_activity[p] == activity_gts[i, t]:
-                        # n_persons = p_group.sum()
-                        correct_social += 1
-        overall_social += oh.size(1)
-    return 100 * (correct_social / overall_social)
+                        correct_groups += 1
+        overall_groups += oh.size(1)
+
+    membership_acc = 100 * (correct_memberships / overall_persons)
+    social_acc = 100 * (correct_persons / overall_persons)
+    grouping_acc = 100 * (correct_groups / overall_groups)
+
+    return membership_acc, social_acc, grouping_acc
 
 
 def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -202,7 +236,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 
 @torch.no_grad()
-def evaluate(dataset, model, criterion, data_loader, device, save_path, if_confuse=False):
+def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if_confuse=False):
     model.eval()
     criterion.eval()
 
@@ -256,7 +290,8 @@ def evaluate(dataset, model, criterion, data_loader, device, save_path, if_confu
                 one_hot_masks = ~targets[3].decompose()[1]
                 pred_activity_logits = outputs['pred_activity_logits']
                 activity_gts = targets[2].decompose()[0]
-                grouping_acc = grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts)
+                pred_group, oh, grouping_acc = grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts)
+
 
 
     # final evaluation
@@ -264,6 +299,7 @@ def evaluate(dataset, model, criterion, data_loader, device, save_path, if_confu
         overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
         overall_idv_action_error = 100 - overall_idv_action_acc * 100
         print('overall_idv_action_error: ', overall_idv_action_error)
+
         if dataset == 'collective':
             print('grouping accuracy: ', grouping_acc)
 
