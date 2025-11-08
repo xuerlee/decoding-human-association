@@ -16,14 +16,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 
-# action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
-# activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
-
-action_names = ['blocking', 'digging', 'falling', 'jumping',
-                'moving', 'setting', 'spiking', 'standing',
-                'waiting']
-activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
-                  'l_set', 'l-spike', 'l-pass', 'l_winpoint']
+action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
+activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
+#
+# action_names = ['blocking', 'digging', 'falling', 'jumping',
+#                 'moving', 'setting', 'spiking', 'standing',
+#                 'waiting']
+# activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
+#                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
 
 def matcher_eval(pred_group, oh):
     # oh: n_persons, n_groups
@@ -62,9 +62,9 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
             pred_group[a, b] = 1
         pred_activity = pred_activity_logits[i].argmax(dim=-1)
 
-        indices = matcher_eval(pred_group, oh)
-        for out_id, tgt_id in indices:
-            correct_person = (oh[out_id].bool() & pred_group[tgt_id].bool()).sum()
+        out_ids, tgt_ids = matcher_eval(pred_group, oh)
+        for out_id, tgt_id in zip(out_ids, tgt_ids):
+            correct_person = (oh.T[tgt_id].bool() & pred_group.T[out_id].bool()).sum()
             correct_memberships += correct_person
             if pred_activity[out_id] == activity_gts[i, tgt_id]:
                 correct_persons += correct_person
@@ -290,7 +290,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 one_hot_masks = ~targets[3].decompose()[1]
                 pred_activity_logits = outputs['pred_activity_logits']
                 activity_gts = targets[2].decompose()[0]
-                pred_group, oh, grouping_acc = grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts)
+                membership_acc, social_acc, grouping_acc = grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts)
 
 
 
@@ -301,6 +301,8 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         print('overall_idv_action_error: ', overall_idv_action_error)
 
         if dataset == 'collective':
+            print('membership accuracy: ', membership_acc)
+            print('social accuracy: ', social_acc)
             print('grouping accuracy: ', grouping_acc)
 
         # confusion matrix
