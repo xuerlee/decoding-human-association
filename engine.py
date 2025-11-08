@@ -2,6 +2,7 @@
 Train and eval functions used in main.py
 Reference:
 https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
+Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
 import math
 import os
