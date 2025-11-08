@@ -49,7 +49,7 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
     overall_groups = 0
     correct_persons = 0
     correct_memberships = 0
-    overall_persons = 1e-6
+    overall_persons = 0
     for i, oh in enumerate(one_hot_gts):
         row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
         oh = oh[row_mask]
@@ -62,13 +62,13 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
             pred_group[a, b] = 1
         pred_activity = pred_activity_logits[i].argmax(dim=-1)
 
-        # out_ids, tgt_ids = matcher_eval(pred_group, oh)
-        # for out_id, tgt_id in zip(out_ids, tgt_ids):
-        #     correct_person = (oh.T[tgt_id].bool() & pred_group.T[out_id].bool()).sum()
-        #     correct_memberships += correct_person
-        #     if pred_activity[out_id] == activity_gts[i, tgt_id]:
-        #         correct_persons += correct_person
-        # overall_persons += oh.size(0)
+        out_ids, tgt_ids = matcher_eval(pred_group, oh)
+        for out_id, tgt_id in zip(out_ids, tgt_ids):
+            correct_person = (oh.T[tgt_id].bool() & pred_group.T[out_id].bool()).sum()
+            correct_memberships += correct_person
+            if pred_activity[out_id] == activity_gts[i, tgt_id]:
+                correct_persons += correct_person
+        overall_persons += oh.size(0)
 
         for p, p_group in enumerate(pred_group.T):
             for t, t_group in enumerate(oh.T):
