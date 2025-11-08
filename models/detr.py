@@ -1,4 +1,7 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+"""
+Reference:
+https://github.com/facebookresearch/detr
+"""
 import numpy as np
 import torch
 import torch.nn.functional as F

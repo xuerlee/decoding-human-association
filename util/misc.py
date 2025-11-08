@@ -1,8 +1,6 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
-Misc functions, including distributed helpers.
-
-Mostly copy-paste from torchvision references.
+Reference:
+https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
 """
 import os
 import subprocess

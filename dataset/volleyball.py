@@ -1,3 +1,7 @@
+"""
+Reference:
+https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
+"""
 import numpy as np
 import skimage.io
 import skimage.transform
@@ -13,11 +17,6 @@ import matplotlib.pyplot as plt
 import random
 import sys
 from pathlib import Path
-
-'''
-Reference:
-https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
-'''
 
 
 Action_names = ['blocking', 'digging', 'falling', 'jumping',

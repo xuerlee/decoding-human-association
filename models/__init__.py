@@ -1,4 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+"""
+Reference:
+https://github.com/facebookresearch/detr
+"""
+
 from .detr import build
 
 

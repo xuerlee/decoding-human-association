@@ -1,6 +1,6 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
-Transformer class.
+Reference:
+https://github.com/facebookresearch/detr
 """
 import copy
 from typing import Optional, List
@@ -9,10 +9,6 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
-'''
-Reference:
-https://github.com/facebookresearch/detr
-'''
 
 class Transformer(nn.Module):
 

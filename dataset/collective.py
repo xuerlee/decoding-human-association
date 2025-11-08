@@ -1,9 +1,13 @@
+"""
+Reference:
+https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
+"""
 import numpy as np
 import skimage.io
 import skimage.transform
-
 import torch
 import torchvision.transforms as transforms
+
 from torch.utils import data
 import torchvision.models as models
 import cv2
@@ -14,10 +18,7 @@ import random
 import sys
 from pathlib import Path
 
-'''
-Reference:
-https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
-'''
+
 
 '''
 Action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']

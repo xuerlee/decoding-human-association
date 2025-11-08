@@ -1,6 +1,7 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
 prepare for the input for transformer
+Reference:
+https://github.com/facebookresearch/detr
 """
 from collections import OrderedDict
 

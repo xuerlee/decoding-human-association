@@ -1,3 +1,7 @@
+"""
+Reference:
+https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
+"""
 from pathlib import Path
 
 import torch

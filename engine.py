@@ -1,5 +1,7 @@
 """
 Train and eval functions used in main.py
+Reference:
+https://github.com/JacobYuan7/DIN-Group-Activity-Recognition-Benchmark
 """
 import math
 import os
