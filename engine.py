@@ -16,14 +16,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 
+# collective:
 action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
 activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
-#
+# volleyball:
 # action_names = ['blocking', 'digging', 'falling', 'jumping',
 #                 'moving', 'setting', 'spiking', 'standing',
 #                 'waiting']
 # activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
 #                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
+# cafe:
+# activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie']
+
 
 def matcher_eval(pred_group, oh):
     # oh: n_persons, n_groups
@@ -58,6 +62,7 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
             pred_group[a, b] = 1
         pred_activity = pred_activity_logits[i].argmax(dim=-1)
 
+        # for membership accuracy and social accuracy
         out_ids, tgt_ids = matcher_eval(pred_group, oh)
         for out_id, tgt_id in zip(out_ids, tgt_ids):
             correct_person = (oh.T[tgt_id].bool() & pred_group.T[out_id].bool()).sum()
@@ -66,17 +71,20 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
                 correct_persons += correct_person
         overall_persons += oh.size(0)
 
+        # for grouping accuracy
         for p, p_group in enumerate(pred_group.T):
             for t, t_group in enumerate(oh.T):
                 if torch.equal(p_group, t_group):
                     if pred_activity[p] == activity_gts[i, t]:
                         correct_groups += 1
+
+        # # for mAP
+        # for p, p_group in enumerate(pred_group.T):
+        #     for t, t_group in enumerate(oh.T):
+
         overall_groups += oh.size(1)
 
-
-
     return correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons
-
 
 def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,

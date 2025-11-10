@@ -79,6 +79,7 @@ def get_args_parser():
     parser.add_argument('--dataset',
                         default='collective',
                         # default='volleyball',
+                        # default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
