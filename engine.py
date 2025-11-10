@@ -44,12 +44,8 @@ def matcher_eval(pred_group, oh):
     return indices  # (out id, tgt id)
 
 
-def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts):
-    correct_groups = 0
-    overall_groups = 0
-    correct_persons = 0
-    correct_memberships = 0
-    overall_persons = 0
+def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
+                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons):
     for i, oh in enumerate(one_hot_gts):
         row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
         oh = oh[row_mask]
@@ -77,11 +73,9 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
                         correct_groups += 1
         overall_groups += oh.size(1)
 
-    membership_acc = 100 * (correct_memberships / overall_persons)
-    social_acc = 100 * (correct_persons / overall_persons)
-    grouping_acc = 100 * (correct_groups / overall_groups)
 
-    return membership_acc, social_acc, grouping_acc
+
+    return correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons
 
 
 def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -242,6 +236,11 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
 
     all_action_preds = []
     all_action_gts = []
+    correct_groups = 0
+    overall_groups = 0
+    correct_persons = 0
+    correct_memberships = 0
+    overall_persons = 0
 
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
@@ -290,7 +289,9 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 one_hot_masks = ~targets[3].decompose()[1]
                 pred_activity_logits = outputs['pred_activity_logits']
                 activity_gts = targets[2].decompose()[0]
-                membership_acc, social_acc, grouping_acc = grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts)
+                correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons = \
+                    grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
+                                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons)
 
     # final evaluation
     if if_confuse:
@@ -299,6 +300,9 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         print('overall_idv_action_error: ', overall_idv_action_error)
 
         if dataset == 'collective':
+            membership_acc = 100 * (correct_memberships / overall_persons)
+            social_acc = 100 * (correct_persons / overall_persons)
+            grouping_acc = 100 * (correct_groups / overall_groups)
             print('membership accuracy: ', membership_acc)
             print('social accuracy: ', social_acc)
             print('grouping accuracy: ', grouping_acc)
