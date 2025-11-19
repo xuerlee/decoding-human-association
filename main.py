@@ -77,21 +77,24 @@ def get_args_parser():
 
     # feature map preparing & roi align
     parser.add_argument('--dataset',
-                        default='collective',
+                        # default='collective',
                         # default='volleyball',
                         # default='cafe',
+                        default='jrdb',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
     parser.add_argument('--feature_map_path',
                         default='/home/jiqqi/data/new-new-collective/img_for_fm_fm', type=str)
     parser.add_argument('--img_path',
-                        default='/home/jiqqi/data/new-new-collective/ActivityDataset',
+                        # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
                         # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
+                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images/image_stitched',
                         type=str)
     parser.add_argument('--ann_path',
-                        default='/home/jiqqi/data/social_CAD/anns',
+                        # default='/home/jiqqi/data/social_CAD/anns',
                         # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
+                        default='/media/jiqqi/新加卷/dataset/JRDB/labels_2d_stitched',
                         type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
@@ -201,8 +204,8 @@ def main(args):
             checkpoint = torch.load(args.resume, map_location='cpu')
         model_without_ddp.load_state_dict(checkpoint['model'])
         if not args.eval and 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
-            # optimizer.load_state_dict(checkpoint['optimizer'])
-            # lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             args.start_epoch = checkpoint['epoch'] + 1
 
     save_path = args.resume.split('/checkpoint')[0]

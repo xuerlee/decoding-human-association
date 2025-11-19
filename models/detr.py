@@ -398,7 +398,7 @@ class MLP(nn.Module):
 
 
 def build(args):
-    # the `num_classes` naming here is somewhat misleading.
+    # the `num_clases` naming here is somewhat misleading.
     # it indeed corresponds to `max_obj_id + 1`, where max_obj_id
     # is the maximum id for a class in your dataset. For example,
     # COCO has a max_obj_id of 90, so we pass `num_classes` to be 91.
@@ -411,6 +411,9 @@ def build(args):
     elif args.dataset == 'volleyball':
         num_action_classes = 9
         num_activity_classes = 8
+    elif args.dataset == 'jrdb':
+        num_action_classes = 26
+        num_activity_classes = 25
     else:
         raise ValueError(f'import dataset {args.dataset} not supported, options: collective, volleyball, jrdb, cafe')
 
