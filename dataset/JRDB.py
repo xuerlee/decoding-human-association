@@ -162,7 +162,7 @@ def jrdb_read_annotations(ann_file):
             person_id = _parse_person_id(obj.get("label_id", ""))
 
             action_name = _argmax_label(obj.get("action_label", {}) or {})
-            if action_name == 'impossible' or None or 'None':
+            if action_name in ('impossible', 'None', None):
                 action_name = 'none'
             action= action_name_to_id[action_name]
 
@@ -366,6 +366,7 @@ class jrdb_Dataset(data.Dataset):
         imgs = torch.squeeze(imgs, 1)  # shape: (10, 3, H, W)
         bboxes = torch.from_numpy(new_bboxes).float()
         actions = torch.from_numpy(actions).long()
+        print(actions)
         activities = torch.from_numpy(activities).long()
         one_hot_matrix = torch.from_numpy(one_hot_matrix).int()
 

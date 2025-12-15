@@ -405,7 +405,6 @@ def build(args):
     # COCO has a max_obj_id of 90, so we pass `num_classes` to be 91.
     # As another example, for a dataset that has a single class with id 1,
     # you should pass `num_classes` to be 2 (max_obj_id + 1).
-    # FIXME: num class of volleyball / JRDB / CAFE
     if args.dataset == 'collective':
         num_action_classes = 6
         num_activity_classes = 6
