@@ -67,6 +67,7 @@ class DETR(nn.Module):
         # valid_areas_f = crop_to_original(mask_f)  # batch size, 4 (ymin ymax xmin xmax)
 
         src_b, mask_b = bboxes.decompose()  # B, n_max, 4
+        # print(mask_b)
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
         boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
         hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
@@ -412,8 +413,11 @@ def build(args):
         num_action_classes = 9
         num_activity_classes = 8
     elif args.dataset == 'jrdb':
-        num_action_classes = 26
-        num_activity_classes = 25
+        num_action_classes = 28
+        num_activity_classes = 28
+    elif args.dataset == 'cafe':
+        num_action_classes = 6
+        num_activity_classes = 6
     else:
         raise ValueError(f'import dataset {args.dataset} not supported, options: collective, volleyball, jrdb, cafe')
 

@@ -12,6 +12,7 @@ import util.transforms as visiontransforms
 
 from .collective import collective_path, collective_read_dataset, collective_all_frames, Collective_Dataset
 from .volleyball import volleyball_path, volleyball_read_dataset, volleyball_all_frames, Volleyball_Dataset
+from .JRDB import jrdb_path, jrdb_read_dataset, jrdb_all_frames, jrdb_Dataset
 
 def build(args):
     img_root = Path(args.img_path)
@@ -76,6 +77,34 @@ def build(args):
         train_dataset = Volleyball_Dataset(train_anns, train_frames, args.img_path, train_transform,
                                           num_frames=args.num_frames, is_training=args.is_training)
         test_dataset = Volleyball_Dataset(test_anns, test_frames, args.img_path, test_transform,
+                                         num_frames=args.num_frames, is_training=args.is_training)
+
+    elif args.dataset == 'jrdb':
+        train_ann_file, test_ann_file = jrdb_path(img_root, ann_root)
+
+        train_anns = jrdb_read_dataset(train_ann_file)  # ann dictionary
+        train_frames = jrdb_all_frames(train_anns, num_frames)  # frame and sec ids: (s, f)
+
+        test_anns = jrdb_read_dataset(test_ann_file)
+        test_frames = jrdb_all_frames(test_anns, num_frames)
+
+        train_transform = visiontransforms.Compose([
+        visiontransforms.RandomHorizontalFlip(),
+        visiontransforms.Resize((args.img_h, args.img_w)),  # bbox resize is integrated in roialingn part
+        # visiontransforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+        visiontransforms.ToTensor(),  # PIL -> Tensor: HWC to CHW
+        # visiontransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+
+        test_transform = visiontransforms.Compose([
+        visiontransforms.Resize((args.img_h, args.img_w)),
+        visiontransforms.ToTensor(),
+        # visiontransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+
+        train_dataset = jrdb_Dataset(train_anns, train_frames, args.img_path, train_transform,
+                                          num_frames=args.num_frames, is_training=args.is_training)
+        test_dataset = jrdb_Dataset(test_anns, test_frames, args.img_path, test_transform,
                                          num_frames=args.num_frames, is_training=args.is_training)
 
     else:

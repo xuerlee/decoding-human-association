@@ -384,14 +384,20 @@ def crop_to_original(mask):
     for i in range(mask.shape[0]):
         indices = mask[i].eq(False).nonzero(as_tuple=False)
         if mask.dim() == 3:
-            y_min, x_min = indices.min(dim=0)[0]  # .min return: values and indices
-            y_max, x_max = indices.max(dim=0)[0]
-            valid_area = [y_min, y_max + 1, x_min, x_max + 1]
+            if len(indices) == 0:
+                valid_area = [-1, -1, -1, -1]
+            else:
+                y_min, x_min = indices.min(dim=0)[0]  # .min return: values and indices
+                y_max, x_max = indices.max(dim=0)[0]
+                valid_area = [y_min, y_max + 1, x_min, x_max + 1]
             valid_areas.append(valid_area)
         if mask.dim() == 2:
-            min = indices.min()
-            max = indices.max()
-            valid_area = [min, max + 1]
+            if len(indices) == 0:
+                valid_area = [-1, -1]
+            else:
+                min = indices.min()
+                max = indices.max()
+                valid_area = [min, max + 1]
             valid_areas.append(valid_area)
     valid_areas = torch.tensor(valid_areas)
     return valid_areas
