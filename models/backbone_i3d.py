@@ -15,7 +15,8 @@ from torchvision.ops import RoIAlign
 from typing import Dict, List
 from util.misc import NestedTensor, is_main_process
 
-from .i3d_old import i3d, i3d_noglobal
+# from .i3d_charade import i3d, i3d_noglobal
+from .i3d_kinetics import i3d, i3d_noglobal
 from .position_encoding import build_position_encoding
 
 
