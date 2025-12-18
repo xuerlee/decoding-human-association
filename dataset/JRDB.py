@@ -366,7 +366,6 @@ class jrdb_Dataset(data.Dataset):
         imgs = torch.squeeze(imgs, 1)  # shape: (10, 3, H, W)
         bboxes = torch.from_numpy(new_bboxes).float()
         actions = torch.from_numpy(actions).long()
-        print(actions)
         activities = torch.from_numpy(activities).long()
         one_hot_matrix = torch.from_numpy(one_hot_matrix).int()
 

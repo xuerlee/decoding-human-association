@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 
 # collective:
-action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
-activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
+# action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
+# activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
 # volleyball:
 # action_names = ['blocking', 'digging', 'falling', 'jumping',
 #                 'moving', 'setting', 'spiking', 'standing',
@@ -27,6 +27,19 @@ activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking'
 #                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
 # cafe:
 # activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie']
+# jrdb:
+action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
+                'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
+                'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
+                'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
+                'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
+                'writing', 'lying', 'pulling', 'none']
+activity_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
+                  'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
+                  'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
+                  'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
+                  'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
+                  'writing', 'lying', 'pulling', 'none']
 
 
 def matcher_eval(pred_group, oh):
