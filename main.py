@@ -31,6 +31,7 @@ def get_args_parser():
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument('--accum_steps', default=4, type=int)
+    parser.add_argument('--if_accum', default=False, type=bool)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=150, type=int)
     parser.add_argument('--lr_drop', default=[50, 100], nargs='+', type=int)
@@ -219,7 +220,7 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             sampler_train.set_epoch(epoch)
-        if args.dataset == 'volleyball':
+        if args.if_accum:
             train_stats = train_one_epoch_accum_steps(
                 model, criterion, data_loader_train, optimizer, device, epoch, writer, args.accum_steps,
                 args.clip_max_norm)  # engine.py -- train_one_epoch
