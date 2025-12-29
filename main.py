@@ -31,7 +31,7 @@ def get_args_parser():
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument('--accum_steps', default=4, type=int)
-    parser.add_argument('--if_accum', default=False, type=bool)
+    parser.add_argument('--if_accum', default=False, action='store_true')
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=150, type=int)
     parser.add_argument('--lr_drop', default=[50, 100], nargs='+', type=int)
