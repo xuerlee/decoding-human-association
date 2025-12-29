@@ -235,7 +235,7 @@ def jrdb_all_frames(anns, num_frames):
         max_f = frames[-1]
 
         for f in frames:
-            if f % 15 != 0:     # (sid, fid) with anns (every 15 frames)
+            if f % 100 != 0:     # (sid, fid) with anns (every 15 frames)
                 continue
             if len(anns[s][f]["persons"]) == 0:
                 continue
