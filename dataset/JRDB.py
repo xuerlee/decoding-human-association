@@ -157,7 +157,7 @@ def jrdb_read_annotations(ann_file):
             x1, y1, x2, y2 = map(float, box)
             if x1 < 0: x1 = 0.0
             if y1 < 0: y1 = 0.0
-            bbox = [x1, y1, x2, y2]
+            bbox = [x1, y1, x1 + x2, y1 + y2]
 
             person_id = _parse_person_id(obj.get("label_id", ""))
 

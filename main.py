@@ -29,7 +29,7 @@ from models import build_model
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
     parser.add_argument('--lr', default=1e-4, type=float)
-    parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--accum_steps', default=4, type=int)
     parser.add_argument('--if_accum', default=False, action='store_true')
     parser.add_argument('--weight_decay', default=1e-4, type=float)
@@ -99,11 +99,11 @@ def get_args_parser():
                         type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
-    parser.add_argument('--img_w', default=224, type=int,
+    parser.add_argument('--img_w', default=752, type=int,
                         help='width of resized images')
-    parser.add_argument('--img_h', default=224, type=int,
+    parser.add_argument('--img_h', default=480, type=int,
                         help='heigh of resized images')
-    parser.add_argument('--num_frames', default=10, type=int,
+    parser.add_argument('--num_frames', default=1, type=int,
                         help='number of stacked frame features')
     parser.add_argument('--feature_channels', default=1392, type=int,  # openpifpaf output
                         help='number of feature channels output by the feature extraction part')
