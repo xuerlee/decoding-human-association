@@ -153,46 +153,49 @@ def jrdb_read_annotations(ann_file):
         annotations[frame_id]['persons'] = []
 
         for obj in objs:
-            box = obj.get("box", [0, 0, 0, 0])
-            x1, y1, x2, y2 = map(float, box)
-            if x1 < 0: x1 = 0.0
-            if y1 < 0: y1 = 0.0
-            bbox = [x1, y1, x1 + x2, y1 + y2]
+            attr = obj.get("attributes")
+            occ = attr["occlusion"]
+            if occ != "Fully_occluded":
+                box = obj.get("box", [0, 0, 0, 0])
+                x1, y1, x2, y2 = map(float, box)
+                if x1 < 0: x1 = 0.0
+                if y1 < 0: y1 = 0.0
+                bbox = [x1, y1, x1 + x2, y1 + y2]
 
-            person_id = _parse_person_id(obj.get("label_id", ""))
+                person_id = _parse_person_id(obj.get("label_id", ""))
 
-            action_name = _argmax_label(obj.get("action_label", {}) or {})
-            if action_name in ('impossible', 'None', None):
-                action_name = 'none'
-            action= action_name_to_id[action_name]
+                action_name = _argmax_label(obj.get("action_label", {}) or {})
+                if action_name in ('impossible', 'None', None):
+                    action_name = 'none'
+                action= action_name_to_id[action_name]
 
-            sg = obj.get("social_group", {}) or {}  # no key -> {}, no value -> {}
-            group_id = int(sg.get("cluster_ID", -1)) - 1  # start by 0
+                sg = obj.get("social_group", {}) or {}  # no key -> {}, no value -> {}
+                group_id = int(sg.get("cluster_ID", -1)) - 1  # start by 0
 
-            activity_name = _argmax_label(obj.get("social_activity", {}) or {})
-            if activity_name not in Activity_names:
-                activity_name = action_name
-            if activity_name == None:
-                activity = activity_name_to_id[action_name]
-            else:
-                activity = activity_name_to_id[activity_name]
+                activity_name = _argmax_label(obj.get("social_activity", {}) or {})
+                if activity_name not in Activity_names:
+                    activity_name = action_name
+                if activity_name == None:
+                    activity = activity_name_to_id[action_name]
+                else:
+                    activity = activity_name_to_id[activity_name]
 
-            if any(person.get('group_id') == group_id for person in annotations[frame_id]['persons']):
-                group = [group for group in annotations[frame_id]['groups'] if group.get('group_id') == group_id][0]
-                group['include_id'].append(person_id)
-            else:
-                annotations[frame_id]['groups'].append({
-                                'group_id': group_id,
-                                'activity': activity,
-                                'include_id': [person_id]
+                if any(person.get('group_id') == group_id for person in annotations[frame_id]['persons']):
+                    group = [group for group in annotations[frame_id]['groups'] if group.get('group_id') == group_id][0]
+                    group['include_id'].append(person_id)
+                else:
+                    annotations[frame_id]['groups'].append({
+                                    'group_id': group_id,
+                                    'activity': activity,
+                                    'include_id': [person_id]
+                                })
+
+                annotations[frame_id]['persons'].append({
+                                'person_id': person_id,
+                                'bbox': bbox,
+                                'action': action,
+                                'group_id': group_id
                             })
-
-            annotations[frame_id]['persons'].append({
-                            'person_id': person_id,
-                            'bbox': bbox,
-                            'action': action,
-                            'group_id': group_id
-                        })
 
         persons, person_id_map = remap_person_ids(
             annotations[frame_id]["persons"])
