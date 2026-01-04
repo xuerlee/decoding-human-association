@@ -99,9 +99,9 @@ def get_args_parser():
                         type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
-    parser.add_argument('--img_w', default=752, type=int,
+    parser.add_argument('--img_w', default=244, type=int,
                         help='width of resized images')
-    parser.add_argument('--img_h', default=480, type=int,
+    parser.add_argument('--img_h', default=244, type=int,
                         help='heigh of resized images')
     parser.add_argument('--num_frames', default=1, type=int,
                         help='number of stacked frame features')

@@ -25,13 +25,13 @@ Action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to s
                 'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
                 'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
                 'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
-                'writing', 'lying', 'pulling', 'none']
+                'writing', 'lying', 'pulling']
 Activity_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
                   'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
                   'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
                   'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
                   'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
-                  'writing', 'lying', 'pulling', 'none']
+                  'writing', 'lying', 'pulling']
 # because a single person is also regareded as a group, activities are set to the same as actions
 # JRDB-act: "Note that for singleton # groups (groups with one member), the social activity labels
 # is identical to the person’s individual actions."
@@ -167,7 +167,8 @@ def jrdb_read_annotations(ann_file):
 
                 action_name = _argmax_label(obj.get("action_label", {}) or {})
                 if action_name in ('impossible', 'None', None):
-                    action_name = 'none'
+                    # action_name = 'none'
+                    continue
                 action= action_name_to_id[action_name]
 
                 sg = obj.get("social_group", {}) or {}  # no key -> {}, no value -> {}

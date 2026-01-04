@@ -412,8 +412,8 @@ def build(args):
         num_action_classes = 9
         num_activity_classes = 8
     elif args.dataset == 'jrdb':
-        num_action_classes = 28
-        num_activity_classes = 28
+        num_action_classes = 27
+        num_activity_classes = 27
     elif args.dataset == 'cafe':
         num_action_classes = 6
         num_activity_classes = 6
