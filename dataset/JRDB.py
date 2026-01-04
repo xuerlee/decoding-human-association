@@ -155,7 +155,8 @@ def jrdb_read_annotations(ann_file):
         for obj in objs:
             attr = obj.get("attributes")
             occ = attr["occlusion"]
-            if occ != "Fully_occluded":
+            noeval = attr["no_eval"]
+            if occ != "Fully_occluded" and noeval == False:
                 box = obj.get("box", [0, 0, 0, 0])
                 x1, y1, x2, y2 = map(float, box)
                 if x1 < 0: x1 = 0.0
