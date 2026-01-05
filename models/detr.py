@@ -412,8 +412,8 @@ def build(args):
         num_action_classes = 9
         num_activity_classes = 8
     elif args.dataset == 'jrdb':
-        num_action_classes = 27
-        num_activity_classes = 27
+        num_action_classes = 11  # only pose-based actions + lying. initial 27 with interaction-based actions
+        num_activity_classes = 11
     elif args.dataset == 'cafe':
         num_action_classes = 6
         num_activity_classes = 6

@@ -20,22 +20,25 @@ import re
 from collections import defaultdict
 
 
-Action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
-                'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
-                'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
-                'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
-                'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
-                'writing', 'lying', 'pulling']
-Activity_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
-                  'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
-                  'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
-                  'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
-                  'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
-                  'writing', 'lying', 'pulling']
+# Action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
+#                 'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
+#                 'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
+#                 'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
+#                 'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
+#                 'writing', 'lying', 'pulling']
+# Activity_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
+#                   'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
+#                   'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
+#                   'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
+#                   'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
+#                   'writing', 'lying', 'pulling']
+Action_names = ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying']
+Activity_names = ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying']
+
+
 # because a single person is also regareded as a group, activities are set to the same as actions
 # JRDB-act: "Note that for singleton # groups (groups with one member), the social activity labels
 # is identical to the person’s individual actions."
-PRIORITY = ["standing", "walking", "sitting", "talking to someone", "eating sth", 'running', 'writing']
 
 def jrdb_path(img_root, ann_root):
     train_seqs = [
@@ -96,20 +99,37 @@ def _parse_person_id(label_id: str, zero_based: bool = False) -> int:
     pid = int(m.group(1))
     return pid - 1 if zero_based else pid  # start by 0
 
-def _argmax_label(score_dict: dict) -> str | None:
+def _argmax_label_action(score_dict: dict) -> str | None:
     # {"standing":2,"holding sth":3} -> "holding sth"
     if not score_dict:
         return None
+    filtered = {
+        k: v for k, v in score_dict.items()
+        if k in Action_names
+    }
 
-    # max_score = max(score_dict.values())
-    # ties = [k for k, v in score_dict.items() if v == max_score]
-    # if len(ties) == 1:
-    #     return ties[0]
-    # priority_ties = [k for k in ties if k in PRIORITY]
-    # candidates = priority_ties if priority_ties else ties
-    # print(sorted(candidates)[0])
-    # return sorted(candidates)[0]
-    return max(score_dict.items(), key=lambda kv: kv[1])[0]
+    if not filtered:
+        # print('action', score_dict)
+        return None
+
+    return max(filtered.items(), key=lambda kv: kv[1])[0]
+    # return max(score_dict.items(), key=lambda kv: kv[1])[0]
+
+
+def _argmax_label_activity(score_dict: dict) -> str | None:
+    # {"standing":2,"holding sth":3} -> "holding sth"
+    if not score_dict:
+        return None
+    filtered = {
+        k: v for k, v in score_dict.items()
+        if k in Activity_names
+    }
+
+    if not filtered:
+        # print('activity', score_dict)
+        return None
+
+    return max(filtered.items(), key=lambda kv: kv[1])[0]
 
 def remap_person_ids(persons):
     """
@@ -165,7 +185,7 @@ def jrdb_read_annotations(ann_file):
 
                 person_id = _parse_person_id(obj.get("label_id", ""))
 
-                action_name = _argmax_label(obj.get("action_label", {}) or {})
+                action_name = _argmax_label_action(obj.get("action_label", {}) or {})
                 if action_name in ('impossible', 'None', None):
                     # action_name = 'none'
                     continue
@@ -174,7 +194,8 @@ def jrdb_read_annotations(ann_file):
                 sg = obj.get("social_group", {}) or {}  # no key -> {}, no value -> {}
                 group_id = int(sg.get("cluster_ID", -1)) - 1  # start by 0
 
-                activity_name = _argmax_label(obj.get("social_activity", {}) or {})
+                activity_name = _argmax_label_activity(obj.get("social_activity", {}) or {})
+                # print(action_name, activity_name)
                 if activity_name not in Activity_names:
                     activity_name = action_name
                 if activity_name == None:

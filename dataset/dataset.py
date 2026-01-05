@@ -13,7 +13,7 @@ import util.transforms as visiontransforms
 from .collective import collective_path, collective_read_dataset, collective_all_frames, Collective_Dataset
 from .volleyball import volleyball_path, volleyball_read_dataset, volleyball_all_frames, Volleyball_Dataset
 from .JRDB import jrdb_path, jrdb_read_dataset, jrdb_all_frames, jrdb_Dataset
-# from .cafe import cafe_path, cafe_read_dataset, cafe_all_frames, cafe_Dataset
+from .cafe import cafe_path
 # from .cafe import cafe_path, cafe_read_dataset, cafe_all_frames, cafe_Dataset
 
 def build(args):
@@ -109,7 +109,8 @@ def build(args):
         test_dataset = jrdb_Dataset(test_anns, test_frames, args.img_path, test_transform,
                                          num_frames=args.num_frames, is_training=args.is_training)
 
-
+    elif args.dataset == 'cafe':
+        train_ann_file, test_ann_file = cafe_path(img_root, ann_root)
     else:
         ValueError("Invalid dataset.")
 
