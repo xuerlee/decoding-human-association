@@ -415,7 +415,7 @@ def build(args):
         num_action_classes = 11  # only pose-based actions + lying. initial 27 with interaction-based actions
         num_activity_classes = 11
     elif args.dataset == 'cafe':
-        num_action_classes = 6
+        num_action_classes = 7  # +individual
         num_activity_classes = 6
     else:
         raise ValueError(f'import dataset {args.dataset} not supported, options: collective, volleyball, jrdb, cafe')

@@ -225,11 +225,14 @@ class Volleyball_Dataset(data.Dataset):
 
         num_persons = len(person_ids)
         num_groups = len(activities)
+        print(num_persons)
+
         one_hot_matrix = np.zeros((num_persons, num_groups), dtype=float)
         # TODO: check if the order of column and the row should change
         person_to_index = {p: i for i, p in enumerate(person_ids)}
 
         for group, persons in enumerate(include_ids):
+            print(include_ids)
             for person in persons:
                 one_hot_matrix[person_to_index[person], group] = 1
 

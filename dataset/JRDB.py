@@ -144,18 +144,20 @@ def remap_person_ids(persons):
 
     return persons, id_map
 
-def remap_group_ids(groups, person_id_map):
+def remap_group_ids(groups, persons, person_id_map):
     """
     groups: list of dicts with 'group_id', 'include_id'
     """
     old_gids = sorted({g["group_id"] for g in groups})
-    gid_map = {old_gid: new_gid for new_gid, old_gid in enumerate(old_gids)}
+    gid_map = {old_gid: new_gid for new_gid, old_gid in enumerate(old_gids)}  # start by 1
 
     for g in groups:
         g["group_id"] = gid_map[g["group_id"]]
         g["include_id"] = [person_id_map[pid] for pid in g["include_id"]]
+    for p in persons:
+        p["group_id"] = gid_map[p["group_id"]]
 
-    return groups, gid_map
+    return persons, groups, gid_map
 
 def jrdb_read_annotations(ann_file):
     annotations = {}  # annotations for each frame
@@ -220,16 +222,12 @@ def jrdb_read_annotations(ann_file):
                                 'group_id': group_id
                             })
 
-        persons, person_id_map = remap_person_ids(
-            annotations[frame_id]["persons"])
-        groups, group_id_map = remap_group_ids(
-            annotations[frame_id]["groups"],
-            person_id_map
-        )
-        annotations[frame_id]["persons"] = persons
-        annotations[frame_id]["groups"] = groups
-        annotations[frame_id]['persons'].sort(key=lambda x: x['person_id'])
-        annotations[frame_id]['groups'].sort(key=lambda x: x['group_id'])
+    persons, person_id_map = remap_person_ids(annotations[frame_id]["persons"])
+    persons, groups, group_id_map = remap_group_ids(annotations[frame_id]["groups"], persons, person_id_map)
+    annotations[frame_id]["persons"] = persons
+    annotations[frame_id]["groups"] = groups
+    annotations[frame_id]['persons'].sort(key=lambda x: x['person_id'])
+    annotations[frame_id]['groups'].sort(key=lambda x: x['group_id'])
 
     return annotations
 

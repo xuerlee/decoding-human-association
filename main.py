@@ -80,8 +80,8 @@ def get_args_parser():
     parser.add_argument('--dataset',
                         # default='collective',
                         # default='volleyball',
-                        default='jrdb',
-                        # default='cafe',
+                        # default='jrdb',
+                        default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
@@ -90,14 +90,14 @@ def get_args_parser():
     parser.add_argument('--img_path',
                         # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
                         # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
-                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
+                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
                         type=str)
     parser.add_argument('--ann_path',
                         # default='/home/jiqqi/data/social_CAD/anns',
                         # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
-                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
+                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
@@ -176,10 +176,13 @@ def main(args):
     # lr_scheduler= torch.optim.lr_scheduler.MultiStepLR(optimizer, args.lr_drop)
 
 
-    if args.input_format == 'feature':
+    if args.input_format == 'feature':  # only collective is available
         dataset_train, dataset_val = build_fmset(args=args)
     elif args.input_format == 'image':
-        dataset_train, dataset_val = build_dataset(args=args)
+        if args.dataset == 'cafe':
+            dataset_train, dataset_val, dataset_test = build_dataset(args=args)
+        else:
+            dataset_train, dataset_val = build_dataset(args=args)
     else:
         raise ValueError(f'import format {args.input_format} not supported, options: image or feature')
 
@@ -197,6 +200,9 @@ def main(args):
                                    num_workers=args.num_workers)  # collate_fn return: CUDA tensor and mask
     data_loader_val = DataLoader(dataset_val, args.batch_size, sampler=sampler_val, collate_fn=utils.collate_fn,
                                  drop_last=False, num_workers=args.num_workers)
+    if args.dataset == 'cafe':
+        data_loader_test = DataLoader(dataset_test, args.batch_size, sampler=sampler_val, collate_fn=utils.collate_fn,
+                                     drop_last=False, num_workers=args.num_workers)
 
     output_dir = Path(args.output_dir)
     if args.resume:
@@ -213,9 +219,14 @@ def main(args):
 
     save_path = args.resume.split('/checkpoint')[0]
     if args.eval:
-        test_stats = evaluate(args, args.dataset, model, criterion, data_loader_val, device, save_path, if_confuse=True)
-        print('test stats:', test_stats)
-        return
+        if args.dataset == 'cafe':
+            test_stats = evaluate(args, args.dataset, model, criterion, data_loader_test, device, save_path, if_confuse=True)
+            print('test stats:', test_stats)
+            return
+        else:
+            test_stats = evaluate(args, args.dataset, model, criterion, data_loader_val, device, save_path, if_confuse=True)
+            print('test stats:', test_stats)
+            return
 
     print("Start training")
     start_time = time.time()
