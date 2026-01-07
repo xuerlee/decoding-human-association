@@ -124,7 +124,8 @@ def viz_i3d_feature_and_rois(  # to verify if roi bboxes are correct
         if x2 > x1 and y2 > y1:
             ax.add_patch(Rectangle((x1, y1), x2 - x1, y2 - y1, **rk))
 
-    ax.set_title(f"I3D feat | sid={meta['sid']}, fid={int(meta['src_fid'])}, frame={frame_idx}, bf_idx={bf_idx}")
+    # ax.set_title(f"I3D feat | sid={meta['sid']}, fid={int(meta['src_fid'])}, frame={frame_idx}, bf_idx={bf_idx}")
+    ax.set_title(f"I3D feat | sid={meta['sid']}, fid={int(meta['cid'])}, frame={frame_idx}, bf_idx={bf_idx}")
     ax.set_xlim([0, FW])
     ax.set_ylim([FH, 0])  # y-axis is aheading down
     plt.tight_layout()
