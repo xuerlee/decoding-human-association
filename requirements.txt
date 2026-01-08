@@ -1,10 +1,10 @@
 cython
 submitit
-torch==1.12.1
-torchvision==0.13.1
+torch>=1.12.1
+torchvision>=0.13.1
 opencv-python
-scipy==1.10.0
-numpy==1.26.4
+scipy>=1.10.0
+numpy>=1.26.4
 pillow
 scikit-image
 scikit-learn

@@ -135,8 +135,9 @@ def get_args_parser():
 
 def main(args):
     writer_dir = args.output_dir.split('/')[-1]
+    base_dir = args.output_dir.split('/')[0: -1]
     if not args.eval:
-        writer = SummaryWriter(log_dir=f'runs/{writer_dir}')
+        writer = SummaryWriter(log_dir=f'{base_dir}/{writer_dir}')
     else:
         writer = None
     utils.init_distributed_mode(args)
