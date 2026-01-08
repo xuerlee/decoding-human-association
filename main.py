@@ -114,6 +114,8 @@ def get_args_parser():
 
     parser.add_argument('--output_dir', default='output_dir/test',
                         help='path where to save, empty for no saving')
+    parser.add_argument('--runs_dir', default='runs/test',
+                        help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
@@ -134,10 +136,10 @@ def get_args_parser():
 
 
 def main(args):
-    writer_dir = args.output_dir.split('/')[-1]
-    base_dir = args.output_dir.split('/')[0: -1]
+    # writer_dir = args.output_dir.split('/')[-1]
     if not args.eval:
-        writer = SummaryWriter(log_dir=f'{base_dir}/{writer_dir}')
+        # writer = SummaryWriter(log_dir=f'runs/{writer_dir}')
+        writer = SummaryWriter(log_dir=args.runs_dir)
     else:
         writer = None
     utils.init_distributed_mode(args)
