@@ -171,7 +171,7 @@ class SetCriterion(nn.Module):
         4 fill the target tensor by targets with the same order as corresponding matched logits
         '''
         idx = self._get_src_permutation_idx(indices)  # length: sum of the number of groups in a whole batch
-
+        print(idx)
         target_classes_o = torch.cat([t[J] for t, (_, J) in zip(tgt_activity_ids, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
         target_classes = torch.full(out_activity_logits.shape[:2], self.num_activity_classes,
                                     dtype=torch.int64, device=out_activity_logits.device)  # the id of the empty group is num_activity_class
@@ -181,6 +181,7 @@ class SetCriterion(nn.Module):
         loss_ce = F.cross_entropy(out_activity_logits.transpose(1, 2), target_classes, weight=self.empty_weight)
 
         matched_logits = out_activity_logits[idx]  # [N_matched, num_activity_classes]
+        print(matched_logits)
         tgt_activity_multi = torch.zeros_like(matched_logits)
         tgt_activity_multi.scatter_(1, target_classes_o.unsqueeze(1), 1.0)
         loss_bce = F.binary_cross_entropy_with_logits(matched_logits, tgt_activity_multi)

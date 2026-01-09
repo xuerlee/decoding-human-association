@@ -465,8 +465,16 @@ def init_distributed_mode(args):
     elif 'SLURM_PROCID' in os.environ:
         args.rank = int(os.environ['SLURM_PROCID'])
         args.gpu = args.rank % torch.cuda.device_count()
+
+        os.environ.setdefault('MASTER_ADDR', os.environ.get('SLURM_SUBMIT_HOST', '127.0.0.1'))
+        os.environ.setdefault('MASTER_PORT', '29500')
     else:
         print('Not using distributed mode')
+        args.distributed = False
+        return
+
+    if args.world_size == 1:
+        print('Not using distributed mode (single process)')
         args.distributed = False
         return
 
