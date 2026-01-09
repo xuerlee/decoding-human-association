@@ -79,8 +79,8 @@ def get_args_parser():
     # feature map preparing & roi align
     parser.add_argument('--dataset',
                         # default='collective',
-                        default='volleyball',
-                        # default='jrdb',
+                        # default='volleyball',
+                        default='jrdb',
                         # default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--input_format', default='image',
@@ -89,14 +89,14 @@ def get_args_parser():
                         default='/home/jiqqi/data/new-new-collective/img_for_fm_fm', type=str)
     parser.add_argument('--img_path',
                         # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
-                        default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
-                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
+                        # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
+                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
                         # default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
                         type=str)
     parser.add_argument('--ann_path',
                         # default='/home/jiqqi/data/social_CAD/anns',
-                        default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
-                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
+                        # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
+                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
                         # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
     parser.add_argument('--is_training', default=True, type=bool,

@@ -179,7 +179,13 @@ class SetCriterion(nn.Module):
 
         self.empty_weight = self.empty_weight.to(out_activity_logits.device)
         loss_ce = F.cross_entropy(out_activity_logits.transpose(1, 2), target_classes, weight=self.empty_weight)
-        losses = {'grp_loss_activity': loss_ce}
+
+        matched_logits = out_activity_logits[idx]  # [N_matched, num_activity_classes]
+        tgt_activity_multi = torch.zeros_like(matched_logits)
+        tgt_activity_multi.scatter_(1, target_classes_o.unsqueeze(1), 1.0)
+        loss_bce = F.binary_cross_entropy_with_logits(matched_logits, tgt_activity_multi)
+
+        losses = {'grp_loss_activity': loss_ce+loss_bce}
 
         if log:
             losses['grp_activity_class_error'] = 100 - accuracy(out_activity_logits[idx], target_classes_o)[0]  # 100 - accuracy
@@ -196,13 +202,19 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_action_logits' in outputs
         src_logits = outputs['pred_action_logits']  # [B, n_max, num_action_classes]
+        num_action_classes = src_logits.shape[-1]
         tgt_action_ids, mask_ids = targets[0].decompose()  # B, n_max
         idx = torch.where(tgt_action_ids != -1)
         tgt_action_ids = tgt_action_ids[idx]  # n_persons in B
         src_logits = src_logits[idx]  # n_persons in B, num_action_classes  # class is always at dim1
+
+        tgt_action_multi = torch.zeros_like(src_logits, device=src_logits.device)
+        tgt_action_multi.scatter_(1, tgt_action_ids.long().unsqueeze(1), 1.0)
+
         # loss_ce = F.cross_entropy(src_logits, tgt_action_ids, label_smoothing=0.05)
         loss_ce = F.cross_entropy(src_logits, tgt_action_ids, ignore_index=-1)  # ignore index instead of multiplying mask
-        losses = {'idv_loss_action': loss_ce}
+        loss_bce = F.binary_cross_entropy_with_logits(src_logits, tgt_action_multi)
+        losses = {'idv_loss_action': loss_ce+loss_bce}
 
         if log:
             losses['idv_action_class_error'] = 100 - accuracy(src_logits, tgt_action_ids)[0]
