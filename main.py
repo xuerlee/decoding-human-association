@@ -173,7 +173,10 @@ def main(args):
     optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
                                   weight_decay=args.weight_decay)
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_drop, gamma=0.1)
+    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_drop, gamma=0.1)
+    lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, 1e-5, 1e-4, step_size_up=4,
+                                                  step_size_down=25, mode='triangular2',
+                                                  cycle_momentum=False)
 
     # optimizer = torch.optim.SGD(param_dicts, lr=args.lr, momentum=0.9, weight_decay=0.0000001)
     # lr_scheduler= torch.optim.lr_scheduler.MultiStepLR(optimizer, args.lr_drop)
@@ -248,17 +251,18 @@ def main(args):
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
             # extra checkpoint before LR drop and every 100 epochs
-            for epoch_lr in args.lr_drop:
-                if (epoch + 1) % epoch_lr == 0 or (epoch + 1) % 100 == 0:
-                    checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
-                for checkpoint_path in checkpoint_paths:
-                    utils.save_on_master({
-                        'model': model_without_ddp.state_dict(),
-                        'optimizer': optimizer.state_dict(),
-                        'lr_scheduler': lr_scheduler.state_dict(),
-                        'epoch': epoch,
-                        'args': args,
-                    }, checkpoint_path)
+            # for epoch_lr in args.lr_drop:
+                # if (epoch + 1) % epoch_lr == 0 or (epoch + 1) % 100 == 0:
+            if (epoch + 1) % 1 == 0:
+                checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+            for checkpoint_path in checkpoint_paths:
+                utils.save_on_master({
+                    'model': model_without_ddp.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'lr_scheduler': lr_scheduler.state_dict(),
+                    'epoch': epoch,
+                    'args': args,
+                }, checkpoint_path)
 
         test_stats = evaluate(args, args.dataset,
             model, criterion, data_loader_val, device, save_path, if_confuse=False
