@@ -334,35 +334,11 @@ def group_mAP_eval(gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_grou
                      c_gt_groups_activity[clip_key][0][group_id].pop() == clas['id'] and len(
                          gt_groups_ids[clip_key][0][group_id]) >= 2]
 
-        # print('gt_groups_ids:', gt_groups_ids)
-        # print('gt_groups_ids.keys():', gt_groups_ids.keys())
-        # print('c_gt_groups_activity', c_gt_groups_activity)
-        # print('clas', clas)
-        # for clip_key in clip_keys:
-        #     print('clipkey:', clip_key)
-        #     if clip_key in gt_groups_ids.keys():
-        #         print('clip_key yes')
-        #         for group_id in gt_groups_ids[clip_key][0].keys():
-        #             # print('pop:', c_gt_groups_activity[clip_key][0][group_id].pop())
-        #             # print('clas id:', clas['id'])
-        #             print('length:', len(
-        #                 gt_groups_ids[clip_key][0][group_id]) >= 2)
-        #             if c_gt_groups_activity[clip_key][0][group_id].pop() == clas['id']:
-        #                 print('id yes')
-        #                 if len(
-        #                     gt_groups_ids[clip_key][0][group_id]) >= 2:
-        #                     print('len yes')
-
-
-
         # denominator of Recall.
         npos = len(gt_groups)
-        print(npos)
-        if npos == 0:
-            group_APs[c] = 0.0
-            continue
-
-
+        # if npos == 0:
+        #     group_APs[c] = 0.0
+        #     continue
 
         # sorts det_groups in descending order for g_score.
         # pred_groups = sorted(pred_groups, key=lambda conf: conf[3], reverse=True)
