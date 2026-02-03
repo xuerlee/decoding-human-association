@@ -135,7 +135,7 @@ def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, o
         for g in range(oh.shape[1]):
             members = torch.where(oh[:, g] == 1)[0].tolist()
             gt_gid_dict[g].extend(members)                  # group_id = g (column index)
-            gt_act_dict[g].add(int(gt_act[g].item()))
+            gt_act_dict[g].add(int(gt_act[g]))
         gt_groups_ids[clip_key].append(gt_gid_dict)
         gt_groups_activity[clip_key].append(gt_act_dict)
 
@@ -329,6 +329,13 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     correct_memberships = 0
     overall_persons = 0
 
+    if dataset == 'cafe':
+        gt_groups_ids_all = defaultdict(list)
+        gt_groups_activity_all = defaultdict(list)
+        pred_groups_ids_all = defaultdict(list)
+        pred_groups_activity_all = defaultdict(list)
+        pred_groups_scores_all = defaultdict(list)
+
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
@@ -381,6 +388,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                                       correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons)
 
             if dataset == 'cafe':
+
                 attention_weights = outputs['attention_weights']
                 one_hot_gts = targets[3].decompose()[0]
                 one_hot_masks = ~targets[3].decompose()[1]
@@ -388,25 +396,22 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 activity_gts = targets[2].decompose()[0]
                 activity_masks = ~targets[2].decompose()[1]
 
-                (gt_groups_ids, gt_groups_activity,
-                 pred_groups_ids, pred_groups_activity, pred_groups_scores) = build_groups_dicts_from_tensors(
+                (gt_groups_ids_b, gt_groups_activity_b,
+                 pred_groups_ids_b, pred_groups_activity_b, pred_groups_scores_b) = build_groups_dicts_from_tensors(
                     args, meta, valid_mask,
                     attention_weights, one_hot_gts, one_hot_masks,
                     pred_activity_logits, activity_gts, activity_masks
                 )
+                for ck in gt_groups_ids_b.keys():
+                    gt_groups_ids_all[ck] = gt_groups_ids_b[ck]
+                    gt_groups_activity_all[ck] = gt_groups_activity_b[ck]
 
-                categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
+                for ck in pred_groups_ids_b.keys():
+                    pred_groups_ids_all[ck] = pred_groups_ids_b[ck]
+                    pred_groups_activity_all[ck] = pred_groups_activity_b[ck]
+                    pred_groups_scores_all[ck] = pred_groups_scores_b[ck]
 
-                mAP10, APs10 = group_mAP_eval(gt_groups_ids, gt_groups_activity,
-                                              pred_groups_ids, pred_groups_activity, pred_groups_scores,
-                                              categories, thresh=1.0)
-                mAP05, APs05 = group_mAP_eval(gt_groups_ids, gt_groups_activity,
-                                              pred_groups_ids, pred_groups_activity, pred_groups_scores,
-                                              categories, thresh=0.5)
 
-                outlier = outlier_metric(gt_groups_ids, gt_groups_activity,
-                                         pred_groups_ids, pred_groups_activity,
-                                         len(categories))
 
     # final evaluation
     if if_confuse:
@@ -423,6 +428,17 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             print('grouping accuracy: ', grouping_acc)
 
         if dataset == 'cafe':
+            categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
+            mAP10, APs10 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
+                                          pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
+                                          categories, thresh=1.0)
+            mAP05, APs05 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
+                                          pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
+                                          categories, thresh=0.5)
+
+            outlier = outlier_metric(gt_groups_ids_all, gt_groups_activity_all,
+                                     pred_groups_ids_all, pred_groups_activity_all,
+                                     len(categories))
             print("CAFE group_mAP@1.0:", mAP10)
             print("CAFE group_mAP@0.5:", mAP05)
             print("CAFE outlier_mIoU:", outlier)
