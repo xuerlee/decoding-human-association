@@ -273,11 +273,11 @@ def outlier_metric(gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_grou
     # prediction groups on each class. defines group has members equals or more than two.
     pred_groups = [[clip_key, group_id, pred_groups_ids[clip_key][0][group_id]] for clip_key in clip_keys if
                   clip_key in gt_groups_ids.keys() for group_id in pred_groups_ids[clip_key][0].keys() if
-                  c_pred_groups_activity[clip_key][0][group_id].pop() == (num_class + 1)]
+                  c_pred_groups_activity[clip_key][0][group_id].pop() == (num_class)]
     # ground truth groups on each class.
     gt_groups = [[clip_key, group_id, gt_groups_ids[clip_key][0][group_id]] for clip_key in clip_keys if
                  clip_key in gt_groups_ids.keys() for group_id in gt_groups_ids[clip_key][0].keys() if
-                 c_gt_groups_activity[clip_key][0][group_id].pop() == (num_class + 1)]
+                 c_gt_groups_activity[clip_key][0][group_id].pop() == (num_class)]
     for clip_key in clip_keys:
         # escapes error that there are not exist pred_image_key on gt.txt.
         if clip_key in gt_groups_ids.keys():

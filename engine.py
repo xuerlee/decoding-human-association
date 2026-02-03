@@ -44,6 +44,9 @@ activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying',
 #                   'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
 #                   'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
 #                   'writing', 'lying', 'pulling', 'none']
+# jrdb_simplified:
+# action_names = ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying']
+# activity_names = ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying']
 
 
 def matcher_eval(pred_group, oh):
