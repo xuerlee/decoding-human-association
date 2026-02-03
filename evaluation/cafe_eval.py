@@ -335,6 +335,12 @@ def group_mAP_eval(gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_grou
 
         # denominator of Recall.
         npos = len(gt_groups)
+        print(npos)
+        if npos == 0:
+            group_APs[c] = 0.0
+            continue
+
+
 
         # sorts det_groups in descending order for g_score.
         # pred_groups = sorted(pred_groups, key=lambda conf: conf[3], reverse=True)
@@ -371,7 +377,7 @@ def group_mAP_eval(gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_grou
         acc_FP = np.cumsum(FP)
         acc_TP = np.cumsum(TP)
         # recall
-        rec = acc_TP / npos
+        rec = acc_TP / max(npos, 1)
         # precision
         prec = np.divide(acc_TP, (acc_FP + acc_TP))
         [ap, mpre, mrec, ii] = calculateAveragePrecision(rec, prec)

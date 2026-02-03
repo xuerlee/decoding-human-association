@@ -149,8 +149,8 @@ def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, o
 
         # build members list for each predicted group (query id)
         for p in range(aw.shape[0]):
-            q = int(gids[p].item())
-            pred_gid_dict[q].append(p)
+            q = int(gids[p].item())  # group id
+            pred_gid_dict[q].append(p)  # person id is appended
 
         # attach act + score for each predicted group id
         for q in pred_gid_dict.keys():
