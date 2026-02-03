@@ -335,7 +335,7 @@ def group_mAP_eval(gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_grou
 
         # denominator of Recall.
         npos = len(gt_groups)
-        print(npos)
+        # print(npos)
         if npos == 0:
             group_APs[c] = 0.0
             continue
