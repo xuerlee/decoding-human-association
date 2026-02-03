@@ -9,12 +9,15 @@ import os
 import sys
 from typing import Iterable
 
+from collections import defaultdict
+import torch.nn.functional as F
 import torch
 from scipy.optimize import linear_sum_assignment
 import util.misc as utils
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+from evaluation.cafe_eval import group_mAP_eval, outlier_metric
 
 # collective:
 # action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
@@ -26,20 +29,21 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classifica
 # activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
 #                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
 # cafe:
-# activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie']
+action_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual']
+activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie']
 # jrdb:
-action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
-                'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
-                'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
-                'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
-                'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
-                'writing', 'lying', 'pulling', 'none']
-activity_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
-                  'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
-                  'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
-                  'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
-                  'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
-                  'writing', 'lying', 'pulling', 'none']
+# action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
+#                 'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
+#                 'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
+#                 'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
+#                 'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
+#                 'writing', 'lying', 'pulling', 'none']
+# activity_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
+#                   'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
+#                   'looking at sth', 'going upstairs', 'bending', 'typing', 'interaction with door',
+#                   'eating sth', 'talking on the phone', 'going downstairs', 'scootering',
+#                   'pointing at sth', 'pushing', 'reading', 'skating', 'running', 'greeting gestures',
+#                   'writing', 'lying', 'pulling', 'none']
 
 
 def matcher_eval(pred_group, oh):
@@ -98,6 +102,68 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
         overall_groups += oh.size(1)
 
     return correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons
+
+
+def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, one_hot_gts, one_hot_masks,
+                                    pred_activity_logits, activity_gts, activity_masks):
+    gt_groups_ids = defaultdict(list)
+    gt_groups_activity = defaultdict(list)
+
+    pred_groups_ids = defaultdict(list)
+    pred_groups_activity = defaultdict(list)
+    pred_groups_scores = defaultdict(list)
+
+    B = pred_activity_logits.shape[0]
+    prob = F.softmax(pred_activity_logits, dim=-1)
+    pred_act = prob.argmax(dim=-1)
+    pred_score = prob.max(dim=-1).values
+
+    for i in range(B):
+        sid = meta[i]["sid"]
+        cid = meta[i]["cid"]
+        clip_key = f"{sid},{cid}"
+
+        row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
+        oh = one_hot_gts[i][row_mask]
+        mask_valid = one_hot_masks[i][row_mask]
+        oh = oh[:, mask_valid[0]]
+
+        gt_act = activity_gts[i][activity_masks[i]]
+
+        gt_gid_dict = defaultdict(list)
+        gt_act_dict = defaultdict(set)
+        for g in range(oh.shape[1]):
+            members = torch.where(oh[:, g] == 1)[0].tolist()
+            gt_gid_dict[g].extend(members)                  # group_id = g (column index)
+            gt_act_dict[g].add(int(gt_act[g].item()))
+        gt_groups_ids[clip_key].append(gt_gid_dict)
+        gt_groups_activity[clip_key].append(gt_act_dict)
+
+        # ---------- Pred membership ----------
+        aw = attention_weights[i][valid_mask[i]]
+        gids = aw.argmax(dim=-1)
+
+        pred_gid_dict = defaultdict(list)
+        pred_act_dict = defaultdict(set)
+        pred_score_dict = defaultdict(set)
+
+        # build members list for each predicted group (query id)
+        for p in range(aw.shape[0]):
+            q = int(gids[p].item())
+            pred_gid_dict[q].append(p)
+
+        # attach act + score for each predicted group id
+        for q in pred_gid_dict.keys():
+            pred_act_dict[q].add(int(pred_act[i, q].item()))
+            pred_score_dict[q].add(float(pred_score[i, q].item()))
+
+        pred_groups_ids[clip_key].append(pred_gid_dict)
+        pred_groups_activity[clip_key].append(pred_act_dict)
+        pred_groups_scores[clip_key].append(pred_score_dict)
+
+    return gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_groups_activity, pred_groups_scores
+
+
 
 def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -314,6 +380,34 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                     grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
                                       correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons)
 
+            if dataset == 'cafe':
+                attention_weights = outputs['attention_weights']
+                one_hot_gts = targets[3].decompose()[0]
+                one_hot_masks = ~targets[3].decompose()[1]
+                pred_activity_logits = outputs['pred_activity_logits']
+                activity_gts = targets[2].decompose()[0]
+                activity_masks = ~targets[2].decompose()[1]
+
+                (gt_groups_ids, gt_groups_activity,
+                 pred_groups_ids, pred_groups_activity, pred_groups_scores) = build_groups_dicts_from_tensors(
+                    args, meta, valid_mask,
+                    attention_weights, one_hot_gts, one_hot_masks,
+                    pred_activity_logits, activity_gts, activity_masks
+                )
+
+                categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
+
+                mAP10, APs10 = group_mAP_eval(gt_groups_ids, gt_groups_activity,
+                                              pred_groups_ids, pred_groups_activity, pred_groups_scores,
+                                              categories, thresh=1.0)
+                mAP05, APs05 = group_mAP_eval(gt_groups_ids, gt_groups_activity,
+                                              pred_groups_ids, pred_groups_activity, pred_groups_scores,
+                                              categories, thresh=0.5)
+
+                outlier = outlier_metric(gt_groups_ids, gt_groups_activity,
+                                         pred_groups_ids, pred_groups_activity,
+                                         len(categories))
+
     # final evaluation
     if if_confuse:
         overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
@@ -327,6 +421,11 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             print('membership accuracy: ', membership_acc)
             print('social accuracy: ', social_acc)
             print('grouping accuracy: ', grouping_acc)
+
+        if dataset == 'cafe':
+            print("CAFE group_mAP@1.0:", mAP10)
+            print("CAFE group_mAP@0.5:", mAP05)
+            print("CAFE outlier_mIoU:", outlier)
 
         # confusion matrix
         utils.plot_confusion_matrix(all_action_gts, all_action_preds, save_path, class_names=action_names)

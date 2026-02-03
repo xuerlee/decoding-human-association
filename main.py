@@ -80,8 +80,8 @@ def get_args_parser():
     parser.add_argument('--dataset',
                         # default='collective',
                         # default='volleyball',
-                        default='jrdb',
-                        # default='cafe',
+                        # default='jrdb',
+                        default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
@@ -90,20 +90,20 @@ def get_args_parser():
     parser.add_argument('--img_path',
                         # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
                         # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
-                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
+                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
                         type=str)
     parser.add_argument('--ann_path',
                         # default='/home/jiqqi/data/social_CAD/anns',
                         # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
-                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
+                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
-    parser.add_argument('--img_w', default=244, type=int,
+    parser.add_argument('--img_w', default=1280, type=int,
                         help='width of resized images')
-    parser.add_argument('--img_h', default=244, type=int,
+    parser.add_argument('--img_h', default=720, type=int,
                         help='heigh of resized images')
     parser.add_argument('--num_frames', default=1, type=int,
                         help='number of stacked frame features')
@@ -120,12 +120,12 @@ def get_args_parser():
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
-                        default='',
-                        # default='output_dir/restartall_hidden256_enc2dec2_groupinglossBCEweights_activityBCEcost_validmask_adamw2/checkpoint0149.pth',
+                        # default='',
+                        default='output_dir/restartall_hidden256_enc2dec2_cafe_kinetics_sampleequal_CyclicLR/checkpoint0004.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--eval', default=False, action='store_true')
+    parser.add_argument('--eval', default=True, action='store_true')
     parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters
