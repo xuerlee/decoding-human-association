@@ -9,7 +9,7 @@ import os
 import sys
 from typing import Iterable
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 import torch.nn.functional as F
 import torch
 from scipy.optimize import linear_sum_assignment
@@ -17,7 +17,7 @@ import util.misc as utils
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
-from evaluation.cafe_eval import group_mAP_eval, outlier_metric
+from evaluation.cafe_eval import group_mAP_eval, outlier_metric, calculateAveragePrecision
 
 # collective:
 # action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
@@ -105,6 +105,86 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
         overall_groups += oh.size(1)
 
     return correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons
+
+
+def bucket_from_size(sz):
+    if sz <= 1: return "G1"
+    if sz == 2: return "G2"
+    if sz == 3: return "G3"
+    if sz == 4: return "G4"
+    return "G5+"
+
+
+def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_gts, one_hot_masks):
+    """
+    Return:
+      records: list of dict(score, tp, bucket)
+      npos_bucket: Counter with GT positives per bucket
+    """
+    records = []
+    npos_bucket = Counter()
+
+    for i, oh in enumerate(one_hot_gts):
+        row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
+        oh = oh[row_mask]
+        mask_valid = one_hot_masks[i][row_mask]
+        oh = oh[:, mask_valid[0]]
+        aw = attention_weights[i][valid_mask[i]]
+
+        # pred group per person + its confidence
+        pred_gid = aw.argmax(dim=-1)
+        score = aw.max(dim=-1).values
+
+        # build pred_group one-hot for matcher_eval
+        pred_group = torch.zeros_like(aw)
+        pred_group[torch.arange(aw.size(0), device=aw.device), pred_gid] = 1
+
+        # -------- Hungarian assignment between pred queries and GT groups --------
+        out_ids, tgt_ids = matcher_eval(pred_group, oh)
+        # mapping: pred_query -> gt_group
+        map_pred2gt = {int(o): int(t) for o, t in zip(out_ids, tgt_ids)}
+
+        # -------- GT group sizes for bucketing (by GT groups) --------
+        # gt group id per person = argmax over columns (because one-hot membership)
+        gt_gid = oh.argmax(dim=1).cpu().tolist()
+        gt_cnt = Counter(gt_gid)
+
+        # count positives per bucket (GT persons)
+        for g in gt_gid:
+            npos_bucket[bucket_from_size(gt_cnt[g])] += 1
+        npos_bucket["overall"] += len(gt_gid)
+
+        # -------- final TP/FP per person --------
+        # person p is TP if mapped(pred_gid[p]) == gt_gid[p]
+        for p in range(len(gt_gid)):
+            pg = int(pred_gid[p].item())
+            mapped = map_pred2gt.get(pg, None)
+            tp = 1 if (mapped is not None and mapped == gt_gid[p]) else 0
+            bucket = bucket_from_size(gt_cnt[gt_gid[p]])
+            records.append({"score": float(score[p].item()), "tp": tp, "bucket": bucket})
+            records.append({"score": float(score[p].item()), "tp": tp, "bucket": "overall"})
+
+    return records, npos_bucket
+
+
+def ap_from_records(records, npos):
+    if npos == 0:
+        return np.nan
+    if len(records) == 0:
+        return 0.0
+
+    records = sorted(records, key=lambda x: -x["score"])
+    tp = np.array([r["tp"] for r in records], dtype=np.float32)
+    fp = 1.0 - tp
+
+    acc_tp = np.cumsum(tp)
+    acc_fp = np.cumsum(fp)
+
+    rec = acc_tp / npos
+    prec = acc_tp / (acc_tp + acc_fp + 1e-8)
+
+    ap, _, _, _ = calculateAveragePrecision(rec.tolist(), prec.tolist())
+    return ap * 100.0
 
 
 def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, one_hot_gts, one_hot_masks,
@@ -332,7 +412,10 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     correct_memberships = 0
     overall_persons = 0
 
-    if dataset == 'cafe':
+    if dataset == 'jrdb':
+        all_records = []
+        npos_bucket = Counter()
+    elif dataset == 'cafe':
         gt_groups_ids_all = defaultdict(list)
         gt_groups_activity_all = defaultdict(list)
         pred_groups_ids_all = defaultdict(list)
@@ -390,8 +473,16 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                     grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
                                       correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons)
 
-            if dataset == 'cafe':
+            if dataset == 'jrdb':
+                attention_weights = outputs['attention_weights']
+                one_hot_gts = targets[3].decompose()[0]
+                one_hot_masks = ~targets[3].decompose()[1]
+                records_b, npos_b = collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_gts,
+                                                                        one_hot_masks)
+                all_records.extend(records_b)
+                npos_bucket.update(npos_b)
 
+            if dataset == 'cafe':
                 attention_weights = outputs['attention_weights']
                 one_hot_gts = targets[3].decompose()[0]
                 one_hot_masks = ~targets[3].decompose()[1]
@@ -415,7 +506,6 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                     pred_groups_scores_all[ck] = pred_groups_scores_b[ck]
 
 
-
     # final evaluation
     if if_confuse:
         overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
@@ -426,11 +516,17 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             membership_acc = 100 * (correct_memberships / overall_persons)
             social_acc = 100 * (correct_persons / overall_persons)
             grouping_acc = 100 * (correct_groups / overall_groups)
-            print('membership accuracy: ', membership_acc)
-            print('social accuracy: ', social_acc)
-            print('grouping accuracy: ', grouping_acc)
+            print('CAD membership accuracy: ', membership_acc)
+            print('CAD social accuracy: ', social_acc)
+            print('CAD grouping accuracy: ', grouping_acc)
 
-        if dataset == 'cafe':
+        elif dataset == 'jrdb':
+            for b in ["G1", "G2", "G3", "G4", "G5+", "overall"]:
+                recs = [r for r in all_records if r["bucket"] == b]
+                ap = ap_from_records(recs, npos_bucket[b])
+                print(b, "AP:", ap)
+
+        elif dataset == 'cafe':
             categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
             mAP10, APs10 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
                                           pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
