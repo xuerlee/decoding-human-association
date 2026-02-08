@@ -23,7 +23,7 @@ TRAIN_CAFE_V = ['1', '2', '5', '6', '9', '10', '13', '14', '17', '18', '21', '22
 VAL_CAFE_V = ['3', '7', '11', '15', '19', '23']
 TEST_CAFE_V = ['4', '8', '12', '16', '20', '24']
 
-def cafe_path(img_root, ann_root, split='view'):
+def cafe_path(img_root, ann_root, split):
 
     if split == 'place':
         train_path = [img_root / str(train_seq) for train_seq in TRAIN_CAFE_P]

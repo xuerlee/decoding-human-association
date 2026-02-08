@@ -113,7 +113,7 @@ def build(args):
         return train_dataset, test_dataset
 
     elif args.dataset == 'cafe':
-        train_path, val_path, test_path = cafe_path(img_root, ann_root)
+        train_path, val_path, test_path = cafe_path(img_root, ann_root, args.cafe_split)
 
         train_anns = cafe_read_dataset(train_path)  # ann dictionary
         train_frames = cafe_all_frames(train_anns, num_frames)  # frame and sec ids: (s, f)
