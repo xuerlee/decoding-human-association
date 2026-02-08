@@ -123,12 +123,12 @@ def get_args_parser():
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
-                        # default='',
-                        default='output_dir/restartall_hidden256_enc2dec2_cafe_kinetics_sampleequal_CyclicLR/checkpoint0004.pth',
+                        default='',
+                        # default='output_dir/restartall_hidden256_enc2dec2_cafe_kinetics_sampleequal_CyclicLR/checkpoint0004.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--eval', default=True, action='store_true')
+    parser.add_argument('--eval', default=False, action='store_true')
     parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters
