@@ -223,7 +223,7 @@ class cafe_Dataset(data.Dataset):
 
         return sample
 
-    def get_frames(self, frame):
+    def  get_frames(self, frame):
         sid, cid, kid, num, interval = frame  # s, f, anns[s][f]['keyframe'], anns[s][f]['numframes'], anns[s][f]['interval']
 
         # if self.is_training:

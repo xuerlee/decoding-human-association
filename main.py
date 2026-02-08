@@ -84,7 +84,7 @@ def get_args_parser():
                         default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--cafe_split',
-                        default='place',
+                        default='view',
                         help='place or view')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
@@ -198,9 +198,13 @@ def main(args):
     if args.distributed:
         sampler_train = DistributedSampler(dataset_train)
         sampler_val = DistributedSampler(dataset_val, shuffle=False)
+        if args.dataset == 'cafe':
+            sampler_test = DistributedSampler(dataset_test, shuffle=False)
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)  # only shuffle with the clips, not the frames inside the clips
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+        if args.dataset == 'cafe':
+            sampler_test = torch.utils.data.SequentialSampler(dataset_test)
 
     batch_sampler_train = torch.utils.data.BatchSampler(
         sampler_train, args.batch_size, drop_last=True)
@@ -210,7 +214,7 @@ def main(args):
     data_loader_val = DataLoader(dataset_val, args.batch_size, sampler=sampler_val, collate_fn=utils.collate_fn,
                                  drop_last=False, num_workers=args.num_workers)
     if args.dataset == 'cafe':
-        data_loader_test = DataLoader(dataset_test, args.batch_size, sampler=sampler_val, collate_fn=utils.collate_fn,
+        data_loader_test = DataLoader(dataset_test, args.batch_size, sampler=sampler_test, collate_fn=utils.collate_fn,
                                      drop_last=False, num_workers=args.num_workers)
 
     output_dir = Path(args.output_dir)
