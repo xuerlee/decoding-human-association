@@ -409,6 +409,10 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
 
     all_action_preds = []
     all_action_gts = []
+
+    all_oh = []
+    all_aw = []
+
     correct_groups = 0
     overall_groups = 0
     correct_persons = 0
@@ -499,6 +503,17 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                     attention_weights, one_hot_gts, one_hot_masks,
                     pred_activity_logits, activity_gts, activity_masks
                 )
+
+                B = attention_weights.shape[0]
+                for i in range(B):
+                    row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
+                    oh = one_hot_gts[i][row_mask]
+                    mask_valid = one_hot_masks[i][row_mask]
+                    oh = oh[:, mask_valid[0]]
+                    aw = attention_weights[i][valid_mask[i]]
+                    all_oh.append(oh.detach().cpu())
+                    all_aw.append(aw.detach().cpu())
+
                 for ck in gt_groups_ids_b.keys():
                     gt_groups_ids_all[ck] = gt_groups_ids_b[ck]
                     gt_groups_activity_all[ck] = gt_groups_activity_b[ck]
@@ -538,7 +553,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                                           pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
                                           categories, thresh=0.5)
 
-            outlier = outlier_metric_from_onehot(one_hot_gts, one_hot_masks, attention_weights, valid_mask)
+            outlier = outlier_metric_from_onehot(all_oh, all_aw)
             print("CAFE group_mAP@1.0:", mAP10)
             print("CAFE group_mAP@0.5:", mAP05)
             print("CAFE outlier_mIoU:", outlier)
