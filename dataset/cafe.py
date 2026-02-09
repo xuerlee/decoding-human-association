@@ -299,6 +299,7 @@ class cafe_Dataset(data.Dataset):
         for group, persons in enumerate(include_ids):
             for person in persons:
                 one_hot_matrix[person_to_index[person], group] = 1
+        print(one_hot_matrix)
 
         imgs = []
         bbox = bboxes.copy()

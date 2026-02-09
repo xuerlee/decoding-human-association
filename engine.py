@@ -17,7 +17,7 @@ import util.misc as utils
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
-from evaluation.cafe_eval import group_mAP_eval, outlier_metric, calculateAveragePrecision
+from evaluation.cafe_eval import group_mAP_eval, outlier_metric_from_onehot, calculateAveragePrecision
 
 # collective:
 # action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
@@ -49,6 +49,7 @@ activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying',
 # activity_names = ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying']
 
 
+# -------------------- CAD ---------------------
 def matcher_eval(pred_group, oh):
     # oh: n_persons, n_groups
     # pred_group: n_persons, n_queries
@@ -107,6 +108,7 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
     return correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons
 
 
+# ----------------------- JRDB --------------------
 def bucket_from_size(sz):
     if sz <= 1: return "G1"
     if sz == 2: return "G2"
@@ -187,6 +189,7 @@ def ap_from_records(records, npos):
     return ap * 100.0
 
 
+# -------------- cafe -----------------
 def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, one_hot_gts, one_hot_masks,
                                     pred_activity_logits, activity_gts, activity_masks):
     gt_groups_ids = defaultdict(list)
@@ -535,9 +538,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                                           pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
                                           categories, thresh=0.5)
 
-            outlier = outlier_metric(gt_groups_ids_all, gt_groups_activity_all,
-                                     pred_groups_ids_all, pred_groups_activity_all,
-                                     len(categories))
+            outlier = outlier_metric_from_onehot(one_hot_gts, one_hot_masks, attention_weights, valid_mask)
             print("CAFE group_mAP@1.0:", mAP10)
             print("CAFE group_mAP@0.5:", mAP05)
             print("CAFE outlier_mIoU:", outlier)

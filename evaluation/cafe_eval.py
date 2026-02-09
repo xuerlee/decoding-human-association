@@ -5,6 +5,7 @@ https://github.com/dk-kim/CAFE_codebase
 from collections import defaultdict, Counter
 import numpy as np
 import copy
+import torch
 
 
 def make_image_key(v_id, c_id, f_id):
@@ -299,6 +300,59 @@ def outlier_metric(gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_grou
     # outlier mIoU.
     outlier_mIoU = np.array(clip_IoU['total']).mean()
     return outlier_mIoU * 100.0
+
+
+def outlier_metric_from_onehot(one_hot_gts, one_hot_masks, attention_weights, valid_mask):
+    """
+    Singleton(outlier) is NOT predicted as a group-activity class.
+    We evaluate outliers by set IoU over persons.
+
+    GT outliers: persons not belonging to any group with size>=2.
+    GT: singleton/outlier = rows with all-zero across groups (after masking)
+    Pred: singleton/outlier =
+          - if group_threshold is provided: max(attn) <= threshold
+          - else: predicted group size == 1 (fallback, not as good)
+    Return: mean IoU over clips * 100
+    """
+    ious = []
+
+    B = one_hot_gts.shape[0]
+    for i in range(B):
+        # ---- crop to valid persons & groups ----
+        row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
+        oh = one_hot_gts[i][row_mask]
+        mask_valid = one_hot_masks[i][row_mask]
+        oh = oh[:, mask_valid[0]]
+
+        P = oh.shape[0]  # num_persons
+        if P == 0:
+            continue
+
+        # ---- GT outliers: row sum == 0 ----
+        gt_out = set(torch.where(oh.sum(dim=1) == 0)[0].tolist())
+
+        # ---- Pred outliers ----
+        aw = attention_weights[i][valid_mask[i]]
+
+        # define outlier as belonging to a predicted group of size 1
+        pred_gid = aw.argmax(dim=-1)
+        # count group sizes
+        uniq, counts = pred_gid.unique(return_counts=True)
+        size_map = {int(u.item()): int(c.item()) for u, c in zip(uniq, counts)}
+        pred_out = set([p for p in range(P) if size_map[int(pred_gid[p].item())] == 1])
+
+        inter = len(gt_out & pred_out)
+        union = len(gt_out | pred_out)
+        if union == 0:
+            iou = 1.0  # both say no outliers
+        else:
+            iou = inter / (union + 1e-8)
+
+        ious.append(iou)
+
+    if len(ious) == 0:
+        return float("nan")
+    return float(np.mean(ious) * 100.0)
 
 
 def group_mAP_eval(gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_groups_activity, pred_groups_scores,
