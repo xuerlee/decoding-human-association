@@ -250,6 +250,84 @@ def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, o
     return gt_groups_ids, gt_groups_activity, pred_groups_ids, pred_groups_activity, pred_groups_scores
 
 
+def group_overlap_maxnorm(det_members, gt_members):
+    """ |inter| / max(|det|, |gt|) """
+    det_set = set(det_members)
+    gt_set = set(gt_members)
+    inter = len(det_set & gt_set)
+    denom = max(len(det_set), len(gt_set))
+    return 0.0 if denom == 0 else inter / denom
+
+
+def group_prf_eval(gt_groups_ids, pred_groups_ids, thresh=0.5, min_group_size=2, ignore_pred_gid_minus1=True):
+    """
+    Evaluate group detection P/R/F1 following:
+      TP if max_gt |inter| / max(|det|,|gt|) > thresh, with 1-1 matching.
+
+    Args:
+      gt_groups_ids: dict clip_key -> [ {gt_gid: [person_ids]} ]
+      pred_groups_ids: dict clip_key -> [ {pred_gid: [person_ids]} ]
+      thresh: overlap threshold (paper uses 0.5)
+      min_group_size: only evaluate groups with size>=min_group_size (typical: 2)
+      ignore_pred_gid_minus1: if your pred dict uses gid=-1 for "no group", skip it
+
+    Returns:
+      precision, recall, f1, (TP, FP, FN)
+    """
+    TP = 0
+    FP = 0
+    FN = 0
+
+    for clip_key in pred_groups_ids.keys():
+        if clip_key not in gt_groups_ids:
+            continue
+
+        gt_dict = gt_groups_ids[clip_key][0]     # {gid: [pids]}
+        pred_dict = pred_groups_ids[clip_key][0] # {gid: [pids]}
+
+        # filter GT groups (usually size>=2)
+        gt_groups = []
+        for gid, members in gt_dict.items():
+            if len(members) >= min_group_size:
+                gt_groups.append((gid, members))
+
+        # filter Pred groups
+        pred_groups = []
+        for gid, members in pred_dict.items():
+            if ignore_pred_gid_minus1 and gid == -1:
+                continue
+            if len(members) >= min_group_size:
+                pred_groups.append((gid, members))
+
+        matched_gt = set()  # store matched GT gid
+
+        # greedy matching: for each pred group, match best available GT group
+        for pgid, pmembers in pred_groups:
+            best_score = 0.0
+            best_gt = None
+            for ggid, gmembers in gt_groups:
+                if ggid in matched_gt:
+                    continue
+                score = group_overlap_maxnorm(pmembers, gmembers)
+                if score > best_score:
+                    best_score = score
+                    best_gt = ggid
+
+            if best_gt is not None and best_score > thresh:
+                TP += 1
+                matched_gt.add(best_gt)
+            else:
+                FP += 1
+
+        # any unmatched GT groups are FN
+        FN += (len(gt_groups) - len(matched_gt))
+
+    precision = TP / (TP + FP + 1e-8)
+    recall = TP / (TP + FN + 1e-8)
+    f1 = 0.0 if (precision + recall) == 0 else (2 * precision * recall / (precision + recall))
+
+    return precision * 100.0, recall * 100.0, f1 * 100.0, (TP, FP, FN)
+
 
 def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -554,9 +632,20 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                                           categories, thresh=0.5)
 
             outlier = outlier_metric_from_onehot(all_oh, all_aw)
+
             print("CAFE group_mAP@1.0:", mAP10)
             print("CAFE group_mAP@0.5:", mAP05)
             print("CAFE outlier_mIoU:", outlier)
+
+            p, r, f1, (TP, FP, FN) = group_prf_eval(
+                gt_groups_ids_all, pred_groups_ids_all,
+                thresh=0.5, min_group_size=2
+            )
+
+            print("group_P@0.5:", p)
+            print("group_R@0.5:", r)
+            print("group_F1@0.5:", f1)
+
 
         # confusion matrix
         utils.plot_confusion_matrix(all_action_gts, all_action_preds, save_path, class_names=action_names)
