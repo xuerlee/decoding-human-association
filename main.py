@@ -69,9 +69,9 @@ def get_args_parser():
                         help="L1 cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
 
     # * Loss coefficients
-    parser.add_argument('--action_loss_coef', default=1, type=float)
-    parser.add_argument('--activity_loss_coef', default=1, type=float)
-    parser.add_argument('--grouping_loss_coef', default=5, type=float)
+    parser.add_argument('--action_loss_coef', default=2, type=float)
+    parser.add_argument('--activity_loss_coef', default=2, type=float)
+    parser.add_argument('--grouping_loss_coef', default=3, type=float)
     parser.add_argument('--consistency_loss_coef', default=2, type=float)
     parser.add_argument('--eos_coef', default=0.1, type=float,
                         help="Relative classification weight of the no-object classes (empty groups)")
@@ -80,12 +80,12 @@ def get_args_parser():
     parser.add_argument('--dataset',
                         # default='collective',
                         # default='volleyball',
-                        # default='jrdb',
-                        default='cafe',
+                        default='jrdb',
+                        # default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--cafe_split',
                         default='view',
-                        help='place or view')
+                        help='by place or bybview for cafe split')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
     parser.add_argument('--feature_map_path',
@@ -93,15 +93,16 @@ def get_args_parser():
     parser.add_argument('--img_path',
                         # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
                         # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
-                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
-                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
+                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
+                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
                         type=str)
     parser.add_argument('--ann_path',
                         # default='/home/jiqqi/data/social_CAD/anns',
                         # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
-                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
-                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
+                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
+                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
+    parser.add_argument('--')
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
     parser.add_argument('--img_w', default=1280, type=int,
@@ -176,10 +177,10 @@ def main(args):
     optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
                                   weight_decay=args.weight_decay)
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
-    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_drop, gamma=0.1)
-    lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, 1e-5, 1e-4, step_size_up=4,
-                                                  step_size_down=25, mode='triangular2',
-                                                  cycle_momentum=False)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_drop, gamma=0.1)
+    # lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, 1e-5, 1e-4, step_size_up=4,
+    #                                               step_size_down=25, mode='triangular2',
+    #                                               cycle_momentum=False)
 
     # optimizer = torch.optim.SGD(param_dicts, lr=args.lr, momentum=0.9, weight_decay=0.0000001)
     # lr_scheduler= torch.optim.lr_scheduler.MultiStepLR(optimizer, args.lr_drop)

@@ -79,6 +79,8 @@ def jrdb_path(img_root, ann_root):
     train_ann_path = [ann_root / f'{train_seq}_image{str(i*2)}.json' for train_seq in train_seqs for i in range(5)]
     val_ann_path = [ann_root / f'{val_seq}_image{str(i*2)}.json' for val_seq in val_seqs for i in range(5)]
 
+    train_detection_path = [ann_root / f'{train_seq}_image{str(i*2)}.json' for train_seq in train_seqs for i in range(5)]
+    val_detection_path = [ann_root / f'{val_seq}_image{str(i*2)}.json' for val_seq in val_seqs for i in range(5)]
 
     PATHS = {
         "train": train_ann_path,
