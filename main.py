@@ -102,7 +102,8 @@ def get_args_parser():
                         default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
                         # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
-    parser.add_argument('--')
+    parser.add_argument('--jrdb_detection_path',
+                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/detections_2d')
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
     parser.add_argument('--img_w', default=1280, type=int,
