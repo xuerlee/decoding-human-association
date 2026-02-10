@@ -69,9 +69,9 @@ def get_args_parser():
                         help="L1 cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
 
     # * Loss coefficients
-    parser.add_argument('--action_loss_coef', default=2, type=float)
-    parser.add_argument('--activity_loss_coef', default=2, type=float)
-    parser.add_argument('--grouping_loss_coef', default=3, type=float)
+    parser.add_argument('--action_loss_coef', default=1, type=float)
+    parser.add_argument('--activity_loss_coef', default=1, type=float)
+    parser.add_argument('--grouping_loss_coef', default=5, type=float)
     parser.add_argument('--consistency_loss_coef', default=2, type=float)
     parser.add_argument('--eos_coef', default=0.1, type=float,
                         help="Relative classification weight of the no-object classes (empty groups)")

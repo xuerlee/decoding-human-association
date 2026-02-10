@@ -562,10 +562,29 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 attention_weights = outputs['attention_weights']
                 one_hot_gts = targets[3].decompose()[0]
                 one_hot_masks = ~targets[3].decompose()[1]
+                pred_activity_logits = outputs['pred_activity_logits']
+                activity_gts = targets[2].decompose()[0]
+                activity_masks = ~targets[2].decompose()[1]
+
                 records_b, npos_b = collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_gts,
                                                                         one_hot_masks)
                 all_records.extend(records_b)
                 npos_bucket.update(npos_b)
+
+                (gt_groups_ids_b, gt_groups_activity_b,
+                 pred_groups_ids_b, pred_groups_activity_b, pred_groups_scores_b) = build_groups_dicts_from_tensors(
+                    args, meta, valid_mask,
+                    attention_weights, one_hot_gts, one_hot_masks,
+                    pred_activity_logits, activity_gts, activity_masks
+                )
+                for ck in gt_groups_ids_b.keys():
+                    gt_groups_ids_all[ck] = gt_groups_ids_b[ck]
+                    gt_groups_activity_all[ck] = gt_groups_activity_b[ck]
+
+                for ck in pred_groups_ids_b.keys():
+                    pred_groups_ids_all[ck] = pred_groups_ids_b[ck]
+                    pred_groups_activity_all[ck] = pred_groups_activity_b[ck]
+                    pred_groups_scores_all[ck] = pred_groups_scores_b[ck]
 
             if dataset == 'cafe':
                 attention_weights = outputs['attention_weights']
@@ -622,6 +641,14 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 ap = ap_from_records(recs, npos_bucket[b])
                 print(b, "AP:", ap)
 
+            p, r, f1, (TP, FP, FN) = group_prf_eval(
+                gt_groups_ids_all, pred_groups_ids_all,
+                thresh=0.5, min_group_size=2
+            )
+            print("group_P@0.5:", p)
+            print("group_R@0.5:", r)
+            print("group_F1@0.5:", f1)
+
         elif dataset == 'cafe':
             categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
             mAP10, APs10 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
@@ -630,9 +657,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             mAP05, APs05 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
                                           pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
                                           categories, thresh=0.5)
-
             outlier = outlier_metric_from_onehot(all_oh, all_aw)
-
             print("CAFE group_mAP@1.0:", mAP10)
             print("CAFE group_mAP@0.5:", mAP05)
             print("CAFE outlier_mIoU:", outlier)
