@@ -79,8 +79,8 @@ def jrdb_path(img_root, ann_root):
     train_ann_path = [ann_root / f'{train_seq}_image{str(i*2)}.json' for train_seq in train_seqs for i in range(5)]
     val_ann_path = [ann_root / f'{val_seq}_image{str(i*2)}.json' for val_seq in val_seqs for i in range(5)]
 
-    train_detection_path = [ann_root / f'{train_seq}_image{str(i*2)}.json' for train_seq in train_seqs for i in range(5)]
-    val_detection_path = [ann_root / f'{val_seq}_image{str(i*2)}.json' for val_seq in val_seqs for i in range(5)]
+    # train_detection_path = [ann_root / f'{train_seq}_image{str(i*2)}.json' for train_seq in train_seqs for i in range(5)]
+    # val_detection_path = [ann_root / f'{val_seq}_image{str(i*2)}.json' for val_seq in val_seqs for i in range(5)]
 
     PATHS = {
         "train": train_ann_path,
@@ -88,9 +88,9 @@ def jrdb_path(img_root, ann_root):
     }
 
     train_ann_file = PATHS['train']
-    test_ann_file = PATHS['val']  # imgs and anns paths
+    val_ann_file = PATHS['val']  # imgs and anns paths
 
-    return train_ann_file, test_ann_file
+    return train_ann_file, val_ann_file
 
 
 def _parse_person_id(label_id: str, zero_based: bool = False) -> int:
@@ -161,7 +161,54 @@ def remap_group_ids(groups, persons, person_id_map):
 
     return persons, groups, gid_map
 
-def jrdb_read_annotations(ann_file):
+
+def box_iou_xyxy(box1, box2):
+    """
+    box1, box2: [x1, y1, x2, y2] (list)
+    return: float IoU
+    """
+
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    inter_w = max(0, x2 - x1)
+    inter_h = max(0, y2 - y1)
+    inter_area = inter_w * inter_h
+
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+
+    union = area1 + area2 - inter_area
+
+    if union == 0:
+        return 0.0
+
+    return inter_area / union
+
+
+def jrdb_read_detections(detection_file):
+    detections = {}
+    with open(detection_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    dets = data.get("detections", {})
+
+    for frame, objs in dets.items():
+        frame_id = int(frame.split('.')[0])
+        detections[frame_id] = []
+
+        for obj in objs:
+            box = obj.get("box", [0, 0, 0, 0])
+            x1, y1, x2, y2 = map(float, box)
+            if x1 < 0: x1 = 0.0
+            if y1 < 0: y1 = 0.0
+            bbox = [x1, y1, x1 + x2, y1 + y2]
+            detections[frame_id].append(bbox)
+
+    return detections
+
+def jrdb_read_annotations(ann_file, seq_detections):
     annotations = {}  # annotations for each frame
     with open(ann_file, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -176,16 +223,29 @@ def jrdb_read_annotations(ann_file):
         annotations[frame_id]['groups'] = []
         annotations[frame_id]['persons'] = []
 
+        detections = seq_detections[frame_id]
+
+        if len(detections) == 0:
+            continue
+
         for obj in objs:
             attr = obj.get("attributes")
             occ = attr["occlusion"]
             noeval = attr["no_eval"]
-            if occ != "Fully_occluded" and occ != 'Severely_occluded' and noeval == False:
+            if occ != "Fully_occluded" and noeval == False:
                 box = obj.get("box", [0, 0, 0, 0])
                 x1, y1, x2, y2 = map(float, box)
                 if x1 < 0: x1 = 0.0
                 if y1 < 0: y1 = 0.0
                 bbox = [x1, y1, x1 + x2, y1 + y2]
+
+                ious = []
+                for bbox_dec in detections:
+                    iou = box_iou_xyxy(bbox, bbox_dec)
+                    ious.append(iou)
+                iou_max = max(ious)
+                if iou_max < 0.5:
+                    continue
 
                 person_id = _parse_person_id(obj.get("label_id", ""))
 
@@ -234,11 +294,14 @@ def jrdb_read_annotations(ann_file):
     return annotations
 
 
-def jrdb_read_dataset(ann_files):
+def jrdb_read_dataset(detection_folder, ann_files):
     data = {}
+    detection = {}
     for ann_file in ann_files:
         sid = str(ann_file).split('/')[-1].split('.')[0]  # sid eg: tressider-2019-03-16_0_image0
-        data[sid] = jrdb_read_annotations(ann_file)  # data for each seq
+        detection_file = detection_folder + '/' + sid + '.json'
+        detection[sid] = jrdb_read_detections(detection_file)
+        data[sid] = jrdb_read_annotations(ann_file, detection[sid])  # data for each seq
     return data
 
 
