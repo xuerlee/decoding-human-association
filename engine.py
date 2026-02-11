@@ -86,8 +86,6 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
 
         # for membership accuracy and social accuracy
         out_ids, tgt_ids = matcher_eval(pred_group, oh)
-        print(out_ids, tgt_ids)
-        print(pred_activity, activity_gts[i])
         for out_id, tgt_id in zip(out_ids, tgt_ids):
             correct_person = (oh.T[tgt_id].bool() & pred_group.T[out_id].bool()).sum()
             correct_memberships += correct_person
