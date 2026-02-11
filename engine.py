@@ -17,7 +17,7 @@ import util.misc as utils
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
-from evaluation.cafe_eval import group_mAP_eval, outlier_metric_from_onehot, calculateAveragePrecision
+from evaluation.cafe_eval import group_mAP_eval, outlier_metric_from_onehot, outlier_metric, calculateAveragePrecision
 
 # collective:
 # action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
@@ -30,7 +30,7 @@ from evaluation.cafe_eval import group_mAP_eval, outlier_metric_from_onehot, cal
 #                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
 # cafe:
 action_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual']
-activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie']
+activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual']
 # jrdb:
 # action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
 #                 'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
@@ -688,10 +688,13 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             mAP05, APs05 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
                                           pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
                                           categories, thresh=0.5)
-            outlier = outlier_metric_from_onehot(all_oh, all_aw)
+            outlier_from_onehot = outlier_metric_from_onehot(all_oh, all_aw)
+            num_class = len(activity_names)
+            outlier = outlier_metric(gt_groups_ids_all, gt_groups_activity_all, pred_groups_ids_all, pred_groups_activity_all, num_class-1)
             print("CAFE group_mAP@1.0:", mAP10)
             print("CAFE group_mAP@0.5:", mAP05)
             print("CAFE outlier_mIoU:", outlier)
+            print("CAFE outlier_mIoU_from_onehot:", outlier_from_onehot)
 
             p, r, f1, (TP, FP, FN) = group_prf_eval(
                 gt_groups_ids_all, pred_groups_ids_all,

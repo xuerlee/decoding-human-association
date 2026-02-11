@@ -61,11 +61,11 @@ def get_args_parser():
     # * Matcher
     parser.add_argument('--set_cost_activity_class', default=2, type=float,
                         help="Group activity class coefficient in the matching cost")
-    parser.add_argument('--set_cost_action_class', default=1, type=float,
+    parser.add_argument('--set_cost_action_class', default=2, type=float,
                         help="Individual action consistence coefficient in the matching cost")
-    parser.add_argument('--set_cost_bce', default=5, type=float,
+    parser.add_argument('--set_cost_bce', default=2, type=float,
                         help="BCE error between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
-    parser.add_argument('--set_cost_size', default=5, type=float,
+    parser.add_argument('--set_cost_size', default=3, type=float,
                         help="L1 cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
 
     # * Loss coefficients
@@ -80,11 +80,11 @@ def get_args_parser():
     parser.add_argument('--dataset',
                         # default='collective',
                         # default='volleyball',
-                        default='jrdb',
-                        # default='cafe',
+                        # default='jrdb',
+                        default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--cafe_split',
-                        default='view',
+                        default='place',
                         help='by place or bybview for cafe split')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
@@ -93,14 +93,14 @@ def get_args_parser():
     parser.add_argument('--img_path',
                         # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
                         # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
-                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
+                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
                         type=str)
     parser.add_argument('--ann_path',
                         # default='/home/jiqqi/data/social_CAD/anns',
                         # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
-                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
+                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
     parser.add_argument('--jrdb_detection_path',
                         default='/media/jiqqi/新加卷/dataset/JRDB/train_images/detections_2d')
@@ -126,6 +126,7 @@ def get_args_parser():
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume',
                         default='',
+                        # default='output_dir/restartall_hidden256_enc2dec2_lossratio223_1frame_kinetic400/checkpoint0250.pth',
                         # default='output_dir/restartall_hidden256_enc2dec2_cafe_kinetics_sampleequal_CyclicLR/checkpoint0004.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',

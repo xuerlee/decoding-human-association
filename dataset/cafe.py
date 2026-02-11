@@ -13,7 +13,7 @@ import cv2
 from PIL import Image
 
 Action_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual']
-Activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie']
+Activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual']
 
 TRAIN_CAFE_P = ['1', '2', '3', '4', '9', '10', '11', '12', '17', '18', '19', '20', '21', '22', '23', '24']
 VAL_CAFE_P = ['13', '14', '15', '16']
@@ -74,8 +74,7 @@ def remap_group_ids(groups, persons, person_id_map):
         g["group_id"] = gid_map[g["group_id"]]
         g["include_id"] = [person_id_map[pid] for pid in g["include_id"]]
     for p in persons:
-        if p["group_id"] != 0:
-            p["group_id"] = gid_map[p["group_id"]]
+        p["group_id"] = gid_map[p["group_id"]]
 
     return persons, groups, gid_map
 
@@ -105,7 +104,7 @@ def cafe_read_annotations(ann_file):
             if y1 < 0: y1 = 0.0
             bbox = [x1, y1, x2, y2]
             if group_name != 'individual':  # group
-                group_id = int(group_name[-1])
+                group_id = int(group_name[-1])  # start from 1
 
                 if actor['attributes'][0]['value'] != "":
                     action = action_name_to_id[actor['attributes'][0]['value']['key']]
@@ -150,6 +149,14 @@ def cafe_read_annotations(ann_file):
                 else:
                     person['action'] = 6
                     person['group_id'] = 0
+
+        for person in annotations['persons']:
+            if person.get('action') == 6:
+                annotations['groups'].append({
+                    'group_id': 0,
+                    'activity': 6,
+                    'include_id': [person.get('person_id')]
+                })
 
     persons, person_id_map = remap_person_ids(annotations["persons"])
     persons, groups, group_id_map = remap_group_ids(annotations["groups"], persons, person_id_map)
@@ -299,6 +306,7 @@ class cafe_Dataset(data.Dataset):
         for group, persons in enumerate(include_ids):
             for person in persons:
                 one_hot_matrix[person_to_index[person], group] = 1
+
 
         imgs = []
         bbox = bboxes.copy()

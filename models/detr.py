@@ -448,7 +448,7 @@ def build(args):
         num_activity_classes = 11
     elif args.dataset == 'cafe':
         num_action_classes = 7  # +individual
-        num_activity_classes = 6
+        num_activity_classes = 7  # +individual
     else:
         raise ValueError(f'import dataset {args.dataset} not supported, options: collective, volleyball, jrdb, cafe')
 
