@@ -70,7 +70,8 @@ def matcher_eval(pred_group, oh):
 
 
 def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
-                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons):
+                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts):
+    num_activity_class = pred_activity_logits.shape[-1] - 1
     for i, oh in enumerate(one_hot_gts):
         row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
         oh = oh[row_mask]
@@ -85,6 +86,8 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
 
         # for membership accuracy and social accuracy
         out_ids, tgt_ids = matcher_eval(pred_group, oh)
+        print(out_ids, tgt_ids)
+        print(pred_activity, activity_gts[i])
         for out_id, tgt_id in zip(out_ids, tgt_ids):
             correct_person = (oh.T[tgt_id].bool() & pred_group.T[out_id].bool()).sum()
             correct_memberships += correct_person
@@ -105,7 +108,14 @@ def grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks,
 
         overall_groups += oh.size(1)
 
-    return correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons
+        gt_activity_cal = torch.full(pred_activity.shape, num_activity_class, device=activity_gts.device)
+        gt_activity_cal[out_ids] = activity_gts[i][tgt_ids]
+
+        all_activity_preds.extend(pred_activity)
+        all_activity_gts.extend(gt_activity_cal)
+
+
+    return correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts
 
 
 # ----------------------- JRDB --------------------
@@ -488,6 +498,9 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     all_action_preds = []
     all_action_gts = []
 
+    all_activity_preds = []
+    all_activity_gts = []
+
     all_oh = []
     all_aw = []
 
@@ -554,9 +567,10 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 one_hot_masks = ~targets[3].decompose()[1]
                 pred_activity_logits = outputs['pred_activity_logits']
                 activity_gts = targets[2].decompose()[0]
-                correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons = \
+                correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
                     grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
-                                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons)
+                                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
+                                      all_activity_preds, all_activity_gts)
 
             if dataset == 'jrdb':
                 attention_weights = outputs['attention_weights']
@@ -566,11 +580,19 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 activity_gts = targets[2].decompose()[0]
                 activity_masks = ~targets[2].decompose()[1]
 
+                # for group activity error
+                correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
+                    grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
+                                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
+                                      all_activity_preds, all_activity_gts)
+
+                # for G1 AP, G2 AP, G3 AP, G4 AP, G5+ AP, Overall AP
                 records_b, npos_b = collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_gts,
                                                                         one_hot_masks)
                 all_records.extend(records_b)
                 npos_bucket.update(npos_b)
 
+                # for p, r, f1
                 (gt_groups_ids_b, gt_groups_activity_b,
                  pred_groups_ids_b, pred_groups_activity_b, pred_groups_scores_b) = build_groups_dicts_from_tensors(
                     args, meta, valid_mask,
@@ -594,6 +616,13 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 activity_gts = targets[2].decompose()[0]
                 activity_masks = ~targets[2].decompose()[1]
 
+                # for group activity error
+                correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
+                    grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
+                                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
+                                      all_activity_preds, all_activity_gts)
+
+                # for Group mAP
                 (gt_groups_ids_b, gt_groups_activity_b,
                  pred_groups_ids_b, pred_groups_activity_b, pred_groups_scores_b) = build_groups_dicts_from_tensors(
                     args, meta, valid_mask,
@@ -626,6 +655,10 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
         overall_idv_action_error = 100 - overall_idv_action_acc * 100
         print('overall_idv_action_error: ', overall_idv_action_error)
+
+        overall_grp_activity_acc = (torch.as_tensor(all_activity_preds) == torch.as_tensor(all_activity_gts)).float().mean()
+        overall_grp_activity_error = 100 - overall_grp_activity_acc * 100
+        print('overall_grp_activity_error: ', overall_grp_activity_error)
 
         if dataset == 'collective':
             membership_acc = 100 * (correct_memberships / overall_persons)
