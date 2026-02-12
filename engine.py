@@ -515,6 +515,11 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     if dataset == 'jrdb':
         all_records = []
         npos_bucket = Counter()
+        gt_groups_ids_all = defaultdict(list)
+        gt_groups_activity_all = defaultdict(list)
+        pred_groups_ids_all = defaultdict(list)
+        pred_groups_activity_all = defaultdict(list)
+        pred_groups_scores_all = defaultdict(list)
     elif dataset == 'cafe':
         gt_groups_ids_all = defaultdict(list)
         gt_groups_activity_all = defaultdict(list)
