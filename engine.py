@@ -213,7 +213,7 @@ def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, o
     pred_score = prob.max(dim=-1).values
 
     for i in range(B):
-        if args.dataset == 'jrdb':
+        if args.dataset == 'jrdb' or args.dataset == 'jrdb_group':
             sid = meta[i]["sid"]
             src_fid = meta[i]["src_fid"]
             clip_key = f"{sid}, {src_fid}"
