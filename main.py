@@ -39,9 +39,9 @@ def get_args_parser():
                         help='gradient clipping max norm')
 
     # * Transformer
-    parser.add_argument('--enc_layers', default=2, type=int,
+    parser.add_argument('--enc_layers', default=6, type=int,
                         help="Number of encoding layers in the transformer")
-    parser.add_argument('--dec_layers', default=2, type=int,
+    parser.add_argument('--dec_layers', default=6, type=int,
                         help="Number of decoding layers in the transformer")
     parser.add_argument('--dim_feedforward', default=2048, type=int,
                         help="Intermediate size of the feedforward layers in the transformer blocks")
@@ -51,7 +51,7 @@ def get_args_parser():
                         help="Dropout applied in the transformer")
     parser.add_argument('--nheads', default=8, type=int,
                         help="Number of attention heads inside the transformer's attentions")
-    parser.add_argument('--num_queries', default=10, type=int,
+    parser.add_argument('--num_queries', default=12, type=int,
                         help="Number of query slots (for group prediction)")
     parser.add_argument('--pre_norm', action='store_true')  # layer norm (similar to batch norm, normalize in each input tensor)
 
@@ -127,7 +127,8 @@ def get_args_parser():
     parser.add_argument('--resume',
                         default='',
                         # default='output_dir/restartall_hidden256_enc2dec2_lossratio223_1frame_kinetic400/checkpoint0250.pth',
-                        # default='output_dir/restartall_hidden256_enc2dec2_cafe_kinetics_sampleequal_CyclicLR/checkpoint0004.pth',
+                        # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_cafe_fullonehot_kinetics_sampleequal_CyclicLR_place/checkpoint0010.pth',
+                        # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdb_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR/checkpoint0029.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')

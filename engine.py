@@ -213,9 +213,11 @@ def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, o
     pred_score = prob.max(dim=-1).values
 
     for i in range(B):
+        print(meta[i])
         if args.dataset == 'jrdb':
             sid = meta[i]["sid"]
-            clip_key = f"{sid}"
+            src_fid = meta[i]["src_fid"]
+            clip_key = f"{sid}, {src_fid}"
         elif args.dataset == 'cafe':
             sid = meta[i]["sid"]
             cid = meta[i]["cid"]
