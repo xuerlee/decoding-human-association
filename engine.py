@@ -580,7 +580,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                                       correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
                                       all_activity_preds, all_activity_gts)
 
-            if dataset == 'jrdb':
+            if dataset == 'jrdb' or dataset == 'jrdb_group':
                 attention_weights = outputs['attention_weights']
                 one_hot_gts = targets[3].decompose()[0]
                 one_hot_masks = ~targets[3].decompose()[1]
