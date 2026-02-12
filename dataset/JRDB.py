@@ -340,11 +340,13 @@ def jrdb_all_frames(anns, num_frames):
 
 
 class jrdb_Dataset(data.Dataset):
-    def __init__(self, anns, frames, img_path, transform, num_frames=10, is_training=True):
+    def __init__(self, dataset, anns, frames, img_path, transform, num_frames=10, is_training=True):
         """
         Args:
             Characterize collective dataset based on feature maps.
         """
+        self.dataset = dataset
+
         self.anns = anns
         self.frames = frames
         self.img_path = img_path
@@ -438,7 +440,14 @@ class jrdb_Dataset(data.Dataset):
         for i, (sid, src_fid, fid) in enumerate(select_frames[2]):  # 10 frames for 1 item
             imgfolder1 = sid.split('_')[-1].replace("image", "image_")
             imgfolder2 = sid.split('_image')[0]
-            img = cv2.imread(self.img_path + '/' + imgfolder1 + '/' + imgfolder2 + '/' + '/%06d.jpg' % (fid))[:, :, [2, 1, 0]]  # BGR -> RGB  # H, W, 3
+
+            if self.dataset == 'jrdb':
+                img = cv2.imread(self.img_path + '/' + imgfolder1 + '/' + imgfolder2 + '/' + '/%06d.jpg' % (fid))[:, :, [2, 1, 0]]  # BGR -> RGB  # H, W, 3
+            elif self.dataset == 'jrdb_group':
+                SEQ = int(os.listdir(self.img_path + '/' + imgfolder1 + '/' + imgfolder2)[0].split('_')[1])
+                img = cv2.imread(self.img_path + '/' + imgfolder1 + '/' + imgfolder2 + '/' + 'SEQ_%02d_%03d.jpg' % (SEQ, fid))[:, :, [2, 1, 0]]  # BGR -> RGB  # H, W, 3
+
+
             img = Image.fromarray(img)
             img, new_bboxes = self.transform(img, bbox)  # bboxes did not changed here
             imgs.append(img)

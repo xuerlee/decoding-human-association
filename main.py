@@ -80,7 +80,8 @@ def get_args_parser():
     parser.add_argument('--dataset',
                         # default='collective',
                         # default='volleyball',
-                        default='jrdb',
+                        # default='jrdb',
+                        default='jrdb_group',
                         # default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--cafe_split',
@@ -93,17 +94,20 @@ def get_args_parser():
     parser.add_argument('--img_path',
                         # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
                         # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
+                        default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/images',
                         # default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
                         type=str)
     parser.add_argument('--ann_path',
                         # default='/home/jiqqi/data/social_CAD/anns',
                         # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
+                        default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/labels/labels_2d',
                         # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
     parser.add_argument('--jrdb_detection_path',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/detections_2d')
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/detections_2d')
+                        default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/detections_2d')
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
     parser.add_argument('--img_w', default=752, type=int,

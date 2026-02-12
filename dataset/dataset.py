@@ -83,7 +83,8 @@ def build(args):
                                          num_frames=args.num_frames, is_training=args.is_training)
         return train_dataset, test_dataset
 
-    elif args.dataset == 'jrdb':
+    elif args.dataset == 'jrdb' or args.dataset == 'jrdb_group':
+        dataset = args.dataset
         train_ann_file, val_ann_file = jrdb_path(img_root, ann_root)
 
         train_anns = jrdb_read_dataset(args.jrdb_detection_path, train_ann_file)  # ann dictionary
@@ -106,9 +107,9 @@ def build(args):
         visiontransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
 
-        train_dataset = jrdb_Dataset(train_anns, train_frames, args.img_path, train_transform,
+        train_dataset = jrdb_Dataset(dataset, train_anns, train_frames, args.img_path, train_transform,
                                           num_frames=args.num_frames, is_training=args.is_training)
-        val_dataset = jrdb_Dataset(val_anns, val_frames, args.img_path, val_transform,
+        val_dataset = jrdb_Dataset(dataset, val_anns, val_frames, args.img_path, val_transform,
                                          num_frames=args.num_frames, is_training=args.is_training)
         return train_dataset, val_dataset
 
