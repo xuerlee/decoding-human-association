@@ -213,9 +213,13 @@ def build_groups_dicts_from_tensors(args, meta, valid_mask, attention_weights, o
     pred_score = prob.max(dim=-1).values
 
     for i in range(B):
-        sid = meta[i]["sid"]
-        cid = meta[i]["cid"]
-        clip_key = f"{sid},{cid}"
+        if args.dataset == 'jrdb':
+            sid = meta[i]["sid"]
+            clip_key = f"{sid}"
+        elif args.dataset == 'cafe':
+            sid = meta[i]["sid"]
+            cid = meta[i]["cid"]
+            clip_key = f"{sid},{cid}"
 
         row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
         oh = one_hot_gts[i][row_mask]
