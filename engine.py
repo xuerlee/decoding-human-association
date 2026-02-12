@@ -676,7 +676,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             print('CAD social accuracy: ', social_acc)
             print('CAD grouping accuracy: ', grouping_acc)
 
-        elif dataset == 'jrdb':
+        elif dataset == 'jrdb' or dataset == 'jrdb_group':
             for b in ["G1", "G2", "G3", "G4", "G5+", "overall"]:
                 recs = [r for r in all_records if r["bucket"] == b]
                 ap = ap_from_records(recs, npos_bucket[b])
