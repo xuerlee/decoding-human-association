@@ -513,7 +513,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     correct_memberships = 0
     overall_persons = 0
 
-    if dataset == 'jrdb':
+    if dataset == 'jrdb' or dataset == 'jrdb_group':
         all_records = []
         npos_bucket = Counter()
         gt_groups_ids_all = defaultdict(list)
