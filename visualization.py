@@ -12,8 +12,16 @@ import colorsys
 import cv2
 from torchvision import transforms
 
-action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
-activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
+# collective activity dataset
+# action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
+# activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
+# cafe:
+# action_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual']
+# activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual', 'Empty']
+# jrdb_simplified:
+action_names = ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying']
+activity_names = ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying', 'empty']
+
 
 class DistinctColorGenerator:
     def __init__(self, saturation=0.7, value=0.9):
@@ -28,20 +36,64 @@ class DistinctColorGenerator:
         return (int(b * 255), int(g * 255), int(r * 255))  # BGR for OpenCV
 
 
-def load_key_img(img_folder_path, meta):
-    key_imgs = []
-    sids = []
-    fids = []
-    for item in meta:
-        sid = str(item['sid']).zfill(2)
-        fid = str(item['src_fid']).zfill(4)
-        img_path = img_folder_path + '/seq' + sid + '/frame' + fid + '.jpg'
-        key_img = cv2.imread(img_path)
-        key_img = cv2.cvtColor(key_img, cv2.COLOR_BGR2RGB)
-        key_imgs.append(key_img)
-        sids.append(sid)
-        fids.append(fid)
-    return key_imgs, sids, fids
+def load_key_img(args, img_folder_path, meta):
+    if args.dataset == 'collective':
+        key_imgs = []
+        sids = []
+        fids = []
+        for item in meta:
+            sid = str(item['sid']).zfill(2)
+            fid = str(item['src_fid']).zfill(4)
+            img_path = img_folder_path + '/seq' + sid + '/frame' + fid + '.jpg'
+            key_img = cv2.imread(img_path)
+            key_img = cv2.cvtColor(key_img, cv2.COLOR_BGR2RGB)
+            key_imgs.append(key_img)
+            sids.append(sid)
+            fids.append(fid)
+        return key_imgs, sids, fids
+
+    elif args.dataset == 'jrdb' or args.dataset == 'jrdb_group':
+        key_imgs = []
+        sids = []
+        fids = []
+        for item in meta:
+            if args.dataset == 'jrdb':
+                sid = str(item['sid'])
+                imgfolder1 = sid.split('_')[-1].replace("image", "image_")
+                imgfolder2 = sid.split('_image')[0]
+                fid = str(item['src_fid']).zfill(6)
+                img_path = img_folder_path + '/' + imgfolder1 + '/' + imgfolder2 + '/' + fid + '.jpg'
+            else:
+                sid = str(item['sid'])
+                imgfolder1 = sid.split('_')[-1].replace("image", "image_")
+                imgfolder2 = sid.split('_image')[0]
+                SEQ = os.listdir(img_folder_path + '/' + imgfolder1 + '/' + imgfolder2)[0].split('_')[1].zfill(2)
+                fid = str(item['src_fid']).zfill(3)
+                img_path = img_folder_path + '/' + imgfolder1 + '/' + imgfolder2 + '/' + 'SEQ_' + SEQ + '_' + fid + '.jpg'
+            key_img = cv2.imread(img_path)
+            key_img = cv2.cvtColor(key_img, cv2.COLOR_BGR2RGB)
+            key_imgs.append(key_img)
+            sids.append(sid)
+            fids.append(fid)
+        return key_imgs, sids, fids
+    elif args.dataset == 'cafe':
+        key_imgs = []
+        sids = []
+        cids = []
+        kids = []
+        for item in meta:
+            sid = str(item['sid'])
+            cid = str(item['cid'])
+            kid = str(item['kid'])
+            img_path = img_folder_path + '/' + sid + '/' + cid + '/images' + f'/frames_{kid}.jpg'
+            key_img = cv2.imread(img_path)
+            key_img = cv2.cvtColor(key_img, cv2.COLOR_BGR2RGB)
+            key_imgs.append(key_img)
+            sids.append(sid)
+            cids.append(cid)
+            kids.append(kid)
+        return key_imgs, sids, cids, kids
+
 
 
 def merge_group_bboxes(bboxes: torch.Tensor, group_ids: torch.Tensor):
@@ -156,7 +208,13 @@ def visualization(model, criterion, data_loader, device, args):
         samples = samples.to(device)  # feature maps
         targets = [t.to(device) for t in targets]  # bboxes, actions, activities, one_hot_matrix
 
-        key_imgs, sids, fids = load_key_img(img_folder_path, meta)  # numpy
+        if args.dataset == 'collective':
+            key_imgs, sids, fids = load_key_img(args, img_folder_path, meta)  # numpy
+        elif args.dataset == 'jrdb' or args.dataset == 'jrdb_group':
+            key_imgs, sids, fids = load_key_img(args, img_folder_path, meta)  # numpy
+        elif args.dataset == 'cafe':
+            key_imgs, sids, cids, kids = load_key_img(args, img_folder_path, meta)  # numpy
+
         bboxes = targets[0].decompose()[0]
         action_gts = targets[1].decompose()[0]
         mask_action = ~targets[1].decompose()[1]
@@ -218,13 +276,20 @@ def visualization(model, criterion, data_loader, device, args):
             activity_gt = activity_gts[i][mask_activity[i]]
 
             img_with_bbox = draw_bboxes(key_img, bbox, action_labels, group_bboxes[i], person_ids[i], valid_activity_labels[i])
-            img_with_bbox_gt = draw_bboxes_gt(key_img, bbox, action_gt, group_bboxes_gt[i], person_ids_gt[i], activities_gt[i])
+            img_with_bbox_gt = draw_bboxes_gt(key_img, bbox, action_gt, group_bboxes_gt[i], person_ids_gt[i], activity_gt)
             # img_with_bbox = draw_bboxes_action_compare(key_img, bbox, action_labels, action_gt)
 
             img_with_bbox = cv2.cvtColor(img_with_bbox, cv2.COLOR_RGB2BGR)
             img_with_bbox_gt = cv2.cvtColor(img_with_bbox_gt, cv2.COLOR_RGB2BGR)
             # cv2.imshow(f'img_seq{sids[i]}_frame{fids[i]}', img_with_bbox)
             # cv2.waitKey(0)
-            cv2.imwrite(output_dir+f'/img_seq{sids[i]}_frame{fids[i]}.jpg', img_with_bbox)
-            cv2.imwrite(output_dir+f'_gt/img_seq{sids[i]}_frame{fids[i]}.jpg', img_with_bbox_gt)
+            if args.dataset == 'collective':
+                cv2.imwrite(output_dir+f'/img_seq{sids[i]}_frame{fids[i]}.jpg', img_with_bbox)
+                cv2.imwrite(output_dir+f'_gt/img_seq{sids[i]}_frame{fids[i]}.jpg', img_with_bbox_gt)
+            elif args.dataset == 'jrdb' or args.dataset == 'jrdb_group':
+                cv2.imwrite(output_dir + f'/img_seq{sids[i]}_frame{fids[i]}.jpg', img_with_bbox)
+                cv2.imwrite(output_dir + f'_gt/img_seq{sids[i]}_frame{fids[i]}.jpg', img_with_bbox_gt)
+            elif args.dataset == 'cafe':
+                cv2.imwrite(output_dir+f'/img_seq{sids[i]}_{cids[i]}_frame{kids[i]}.jpg', img_with_bbox)
+                cv2.imwrite(output_dir+f'_gt/img_seq{sids[i]}_{cids[i]}_frame{kids[i]}.jpg', img_with_bbox_gt)
     return

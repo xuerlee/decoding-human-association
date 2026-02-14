@@ -230,7 +230,7 @@ class cafe_Dataset(data.Dataset):
 
         return sample
 
-    def  get_frames(self, frame):
+    def get_frames(self, frame):
         sid, cid, kid, num, interval = frame  # s, f, anns[s][f]['keyframe'], anns[s][f]['numframes'], anns[s][f]['interval']
 
         # if self.is_training:
@@ -259,7 +259,7 @@ class cafe_Dataset(data.Dataset):
             sample_frames = np.multiply(list(range(self.num_frames)), segment_duration) + np.random.randint(
                 segment_duration, size=self.num_frames)
 
-        return sid, cid, [(sid, cid, int(fid * interval)) for fid in sample_frames]            # normal testing: each test loading 10 frames
+        return sid, cid, kid, [(sid, cid, int(fid * interval)) for fid in sample_frames]            # normal testing: each test loading 10 frames
 
     def load_samples_sequence(self, select_frames):
     #     if torch.cuda.is_available():
@@ -269,6 +269,7 @@ class cafe_Dataset(data.Dataset):
 
         sid = select_frames[0]
         cid = select_frames[1]
+        kid = select_frames[2]
 
         person_ids = []
         bboxes = []
@@ -311,7 +312,7 @@ class cafe_Dataset(data.Dataset):
         imgs = []
         bbox = bboxes.copy()
         bbox = np.array(bbox, dtype=np.float64).reshape(-1, 4)
-        for i, (sid, cid, fid) in enumerate(select_frames[2]):  # 10 frames for 1 item
+        for i, (sid, cid, fid) in enumerate(select_frames[3]):  # 10 frames for 1 item
             img = cv2.imread(self.img_path + '/' + sid + '/' + cid + '/images' + f'/frames_{fid}.jpg')[:, :, [2, 1, 0]]  # BGR -> RGB  # H, W, 3
             img = Image.fromarray(img)
             img, new_bboxes = self.transform(img, bbox)  # bboxes did not changed here
@@ -334,6 +335,7 @@ class cafe_Dataset(data.Dataset):
 
         meta['sid'] = sid
         meta['cid'] = cid
+        meta['kid'] = kid
         meta['frame_size'] = (1080, 1920)
 
         return imgs, bboxes, actions, activities, one_hot_matrix, meta
