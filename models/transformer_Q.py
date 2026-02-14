@@ -310,7 +310,7 @@ class TransformerDecoderLayer(nn.Module):
         tgt = self.norm1(tgt)
         tgt2, attention_weights, attention_logits = self.multihead_attn(query=self.with_pos_embed(tgt2, query_pos),
                                    key=self.with_pos_embed(memory, pos),
-                                   value=memory, attn_mask=memory_mask,
+                                   value=memory,
                                    key_padding_mask=memory_key_padding_mask)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
@@ -334,7 +334,7 @@ class TransformerDecoderLayer(nn.Module):
         tgt2 = self.norm2(tgt)
         tgt2, attention_weights, attention_logits = self.multihead_attn(query=self.with_pos_embed(tgt2, query_pos),
                                    key=self.with_pos_embed(memory, pos),
-                                   value=memory, attn_mask=memory_mask,
+                                   value=memory,
                                    key_padding_mask=memory_key_padding_mask)
         tgt = tgt + self.dropout2(tgt2)
 
