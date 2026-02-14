@@ -71,7 +71,7 @@ class DETR(nn.Module):
         # print(mask_b)
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
         boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
-        hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
+        hs, memory, attention_weights, attention_logits = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
 
         # individual action classfication
         B = src_f.shape[0]
@@ -92,9 +92,10 @@ class DETR(nn.Module):
 
         # for grouping based on attention weights
         attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
+        attention_logits = attention_logits.transpose(1, 2).contiguous()  # B, n_max, num_queries
         # attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
 
-        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
+        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights, 'attention_logits': attention_logits}  # activity scores: only take the output of the last later here
 
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
@@ -243,8 +244,8 @@ class SetCriterion(nn.Module):
     def loss_grouping(self, outputs, targets, indices, num_groups):
         """Compute the losses related to the grouping results, using the binary cross entropy loss
         """
-        assert 'attention_weights' in outputs
-        src_aw = outputs['attention_weights']  # B, n_max, num_queries
+        assert 'attention_logits' in outputs
+        src_aw = outputs['attention_logits']  # B, n_max, num_queries
 
         tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
         tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max  # regard persons as cls
@@ -276,9 +277,11 @@ class SetCriterion(nn.Module):
 
         # loss -nll
         P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
-        P = P.clamp_min(1e-6)
-        correct_prob = (P * target_one_hot.float()).sum(dim=1)
-        person_valid = valid_mask.any(dim=1)
+        logP_qn = F.log_softmax(P, dim=0)
+        correct_prob = (logP_qn * target_one_hot.float()).sum(dim=1)  # [B, n_max] get the prob of the person belonging to the correct group
+        correct_prob = correct_prob.clamp_min(1e-6)
+        # valid_mask: [B, num_queries, n_max]
+        person_valid = valid_mask.any(dim=1)  # [B, n_max] if False: the person is dummy which is not included in any group
         loss_grouping = (-correct_prob[person_valid].log()).mean()
 
         losses = {}

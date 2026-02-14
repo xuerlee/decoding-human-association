@@ -62,7 +62,7 @@ class HungarianMatcher(nn.Module):
         # F.cross entropy = softmax + negative log likelihood loss; F.binary_cross_entropy_with_logits = sigmoid + BCE
         # out_activity_prob = outputs["pred_activity_logits"].flatten(0, 1).softmax(-1).view(bs, num_queries, -1)  # get likelihood, [batch_size, num_queries, num_activity_classes]
         out_activity_prob = outputs["pred_activity_logits"].view(bs, num_queries, -1)  # [batch_size, num_queries, num_activity_classes]
-        out_attw = outputs['attention_weights']  # B, n_max, num_queries
+        out_attw = outputs['attention_logits']  # B, n_max, num_queries
 
         # target labels and assignments
         tgt_activity_ids, mask_ids = targets[0].decompose()  # B, num_group_max
@@ -87,8 +87,9 @@ class HungarianMatcher(nn.Module):
             # tgt_size = tgt_one_hot_b.sum(dim=-1)
             # out_size = out_attw_b.sum(dim=-1)
 
-            P_qn = out_attw_b.clamp_min(1e-6)  # [Q, N]
-            logP_qn = P_qn.log()
+            # P_qn = out_attw_b.clamp_min(1e-6)  # [Q, N]
+            # logP_qn = P_qn.log()
+            logP_qn = F.log_softmax(out_attw_b, dim=0)
 
             grouping_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             activity_cost = torch.zeros(num_queries, n_group, device=out_attw.device)

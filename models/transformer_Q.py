@@ -97,8 +97,9 @@ class MultiheadAssignmentAttention(nn.Module):
 
         # return mean assignment over heads for supervision/matching: [B,Q,N]
         P_mean = P.mean(dim=1)
+        scores_mean = scores.mean(dim=1)
 
-        return out, P_mean
+        return out, P_mean, scores_mean
 
 
 class Transformer_Q(nn.Module):
@@ -139,9 +140,9 @@ class Transformer_Q(nn.Module):
 
         tgt = torch.zeros_like(query_embed)
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)  # memory: n_max, B, hidden_dim
-        hs, attention_weights = self.decoder(tgt, memory, memory_key_padding_mask=mask,
+        hs, attention_weights, attention_logits = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)  # hs: (num_layers,) num_queries, B, hidden_dim; attention weights: B, num_queries, n_max
-        return hs.transpose(1, 2), memory.permute(1, 0, 2), attention_weights  # hs: (num_layers,), B, num_queries, hidden_dim, memory: B, n_max, hidden_dim
+        return hs.transpose(1, 2), memory.permute(1, 0, 2), attention_weights, attention_logits  # hs: (num_layers,), B, num_queries, hidden_dim, memory: B, n_max, hidden_dim
 
 
 
@@ -190,7 +191,7 @@ class TransformerDecoder(nn.Module):
         intermediate = []
 
         for layer in self.layers:
-            output, attention_weights = layer(output, memory, tgt_mask=tgt_mask,
+            output, attention_weights, attention_logits = layer(output, memory, tgt_mask=tgt_mask,
                            memory_mask=memory_mask,
                            tgt_key_padding_mask=tgt_key_padding_mask,
                            memory_key_padding_mask=memory_key_padding_mask,
@@ -205,9 +206,9 @@ class TransformerDecoder(nn.Module):
                 intermediate.append(output)
 
         if self.return_intermediate:
-            return torch.stack(intermediate), attention_weights  # stack all intermediate output of all decoder layers
+            return torch.stack(intermediate), attention_weights, attention_logits  # stack all intermediate output of all decoder layers
 
-        return output.unsqueeze(0), attention_weights
+        return output.unsqueeze(0), attention_weights, attention_logits
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -307,18 +308,16 @@ class TransformerDecoderLayer(nn.Module):
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
-        tgt2, attention_weights = self.multihead_attn(
-            query=self.with_pos_embed(tgt, query_pos),
-            key=self.with_pos_embed(memory, pos),
-            value=memory,
-            key_padding_mask=memory_key_padding_mask
-        )
+        tgt2, attention_weights, attention_logits = self.multihead_attn(query=self.with_pos_embed(tgt2, query_pos),
+                                   key=self.with_pos_embed(memory, pos),
+                                   value=memory, attn_mask=memory_mask,
+                                   key_padding_mask=memory_key_padding_mask)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
         tgt = tgt + self.dropout3(tgt2)  # 3 residual blocks
         tgt = self.norm3(tgt)
-        return tgt, attention_weights
+        return tgt, attention_weights, attention_logits
 
     def forward_pre(self, tgt, memory,
                     tgt_mask: Optional[Tensor] = None,
@@ -333,7 +332,7 @@ class TransformerDecoderLayer(nn.Module):
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt2 = self.norm2(tgt)
-        tgt2, attention_weights = self.multihead_attn(query=self.with_pos_embed(tgt2, query_pos),
+        tgt2, attention_weights, attention_logits = self.multihead_attn(query=self.with_pos_embed(tgt2, query_pos),
                                    key=self.with_pos_embed(memory, pos),
                                    value=memory, attn_mask=memory_mask,
                                    key_padding_mask=memory_key_padding_mask)
@@ -342,7 +341,7 @@ class TransformerDecoderLayer(nn.Module):
         tgt2 = self.norm3(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
         tgt = tgt + self.dropout3(tgt2)
-        return tgt, attention_weights
+        return tgt, attention_weights, attention_logits
 
     def forward(self, tgt, memory,
                 tgt_mask: Optional[Tensor] = None,
