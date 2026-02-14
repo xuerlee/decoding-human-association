@@ -110,9 +110,9 @@ def get_args_parser():
                         default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/detections_2d')
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
-    parser.add_argument('--img_w', default=1280, type=int,
+    parser.add_argument('--img_w', default=224, type=int,
                         help='width of resized images')
-    parser.add_argument('--img_h', default=720, type=int,
+    parser.add_argument('--img_h', default=224, type=int,
                         help='heigh of resized images')
     parser.add_argument('--num_frames', default=10, type=int,
                         help='number of stacked frame features')

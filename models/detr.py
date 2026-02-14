@@ -17,6 +17,7 @@ from .backbone_i3d import build_backboneI3D
 from .backbone import build_backbone
 from .matcher import build_matcher
 from .transformer import build_transformer
+from .transformer_Q import build_transformer_Q
 import time
 
 class DETR(nn.Module):
@@ -43,7 +44,7 @@ class DETR(nn.Module):
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
-        self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
+        # self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
         self.dropout = nn.Dropout(p=0.1)  # set zeros randomly, no influences on valid mask
         self.backbone = backbone
         self.aux_loss = aux_loss
@@ -71,18 +72,6 @@ class DETR(nn.Module):
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
         boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
         hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
-       #  hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, None)  # without positional embeddings
-
-        # only individual action (for debug)
-        # B = src_f.shape[0]
-        # n_max = src_b.shape[1]
-        # mask = ~mask.view(B, n_max)
-        # boxes_features = self.dropout(boxes_features)
-        # outputs_action_class = self.action_class_embed_bac(boxes_features)  # B, n_max, num_action_classes
-        # outputs_action_class = self.dropout(outputs_action_class)
-        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
-        # action_scores = outputs_action_class
-        # out = {'pred_action_logits': action_scores}
 
         # individual action classfication
         B = src_f.shape[0]
@@ -91,16 +80,9 @@ class DETR(nn.Module):
         memory = self.dropout(memory)
         mask = ~mask.view(B, n_max)
 
-        # boxes_features_ini = self.dropout(boxes_features_ini)
-        # outputs_action_class_bac = self.action_class_embed_bac(boxes_features_ini)
-        # outputs_action_class_bac = self.dropout(outputs_action_class_bac)
-        # outputs_action_class = self.dropout(outputs_action_class_bac)
-
         outputs_action_class = self.action_class_embed(memory)  # B, n_max, num_action_classe
         outputs_action_class = self.dropout(outputs_action_class)
 
-        # outputs_action_class = outputs_action_class * mask.unsqueeze(-1)
-        # action_scores = outputs_action_class_bac + outputs_action_class
         action_scores = outputs_action_class
 
         # group activity classification
@@ -110,9 +92,7 @@ class DETR(nn.Module):
 
         # for grouping based on attention weights
         attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
-        attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
-        # attention_weights = F.softmax(attention_weights, dim=2)  # make the sum of logits as 1  (each person belongs to which group)
-        # attention_weights = attention_weights * mask.unsqueeze(-1)  # B, n_max, num_queries
+        # attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
 
         out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
 
@@ -186,9 +166,7 @@ class SetCriterion(nn.Module):
         matched_logits = out_activity_logits[idx]  # [N_matched, num_activity_classes]
         tgt_activity_multi = torch.zeros_like(matched_logits)
         tgt_activity_multi.scatter_(1, target_classes_o.unsqueeze(1), 1.0)  # empty groups are not included
-        loss_bce = F.binary_cross_entropy_with_logits(matched_logits, tgt_activity_multi)
 
-        # losses = {'grp_loss_activity': loss_ce+loss_bce}
         losses = {'grp_loss_activity': loss_ce}
 
         if log:
@@ -265,7 +243,6 @@ class SetCriterion(nn.Module):
     def loss_grouping(self, outputs, targets, indices, num_groups):
         """Compute the losses related to the grouping results, using the binary cross entropy loss
         """
-        # TODO: cross entropy
         assert 'attention_weights' in outputs
         src_aw = outputs['attention_weights']  # B, n_max, num_queries
 
@@ -286,16 +263,23 @@ class SetCriterion(nn.Module):
         valid_mask = valid_mask.transpose(1, 2)   # B, num_queries, n_max
         valid_mask[idx] = mask_one_hot_o
 
-        # loss w.s.t assigning people to group
-        pos = target_one_hot[valid_mask].sum()
-        neg = target_one_hot[valid_mask].numel() - pos
-        pos_weight = (neg / (pos + 1e-6)).clamp(1., 50.)
-        pos_weight = pos_weight.to(target_one_hot.device)
-        loss_grouping = F.binary_cross_entropy_with_logits(src_aw.transpose(1, 2)[valid_mask], target_one_hot[valid_mask].float(), pos_weight=pos_weight)
+        # # loss w.s.t assigning people to group
+        # pos = target_one_hot[valid_mask].sum()
+        # neg = target_one_hot[valid_mask].numel() - pos
+        # pos_weight = (neg / (pos + 1e-6)).clamp(1., 50.)
+        # pos_weight = pos_weight.to(target_one_hot.device)
+        # loss_grouping = F.binary_cross_entropy_with_logits(src_aw.transpose(1, 2)[valid_mask], target_one_hot[valid_mask].float(), pos_weight=pos_weight)
 
         # loss w.s.t grouping people
         # target_group = target_one_hot.transpose(1, 2).argmax(-1)  # B, n_max
         # loss_grouping = F.cross_entropy(src_aw.transpose(1, 2), target_group)
+
+        # loss -nll
+        P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
+        P = P.clamp_min(1e-6)
+        correct_prob = (P * target_one_hot.float()).sum(dim=1)
+        person_valid = valid_mask.any(dim=1)
+        loss_grouping = (-correct_prob[person_valid].log()).mean()
 
         losses = {}
         # losses['loss_grouping'] = loss_grouping.sum() / num_groups
@@ -464,7 +448,8 @@ def build(args):
     else:
         raise ValueError(f'import format {args.input_format} not supported, options: image or feature')
 
-    transformer = build_transformer(args)
+    # transformer = build_transformer(args)
+    transformer = build_transformer_Q(args)
 
     model = DETR(
         backbone,

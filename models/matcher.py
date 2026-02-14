@@ -74,13 +74,12 @@ class HungarianMatcher(nn.Module):
         indices = []
         for b in range(bs):
             tgt_activity_ids_b = tgt_activity_ids[b][valid_areas_ids[b][0]: valid_areas_ids[b][1]]  # [num_group]
-            tgt_activity_ids_b = F.one_hot(tgt_activity_ids_b, num_activity_classes)  # num_group, num_activity_cls
+            tgt_activity_ids_b_oh = F.one_hot(tgt_activity_ids_b, num_activity_classes)  # num_group, num_activity_cls
             tgt_one_hot_b = tgt_one_hot[b][valid_areas_one_hot[b][0]: valid_areas_one_hot[b][1], valid_areas_one_hot[b][2]: valid_areas_one_hot[b][3]]  # n_persons, n_groups
             n_group = len(tgt_activity_ids_b)
             n_person = tgt_one_hot_b.shape[0]
             out_activity_prob_b = out_activity_prob[b]  # [num_queries, num_classes]
             out_attw_b = out_attw[b][0: n_person, :]  # [num_persons, num_queries]
-            # out_attw_b = out_attw_b.softmax(dim=-1)
 
             tgt_one_hot_b = tgt_one_hot_b.T  # num_groups, n_persons
             out_attw_b = out_attw_b.T  # num_queries, n_persons
@@ -88,16 +87,34 @@ class HungarianMatcher(nn.Module):
             # tgt_size = tgt_one_hot_b.sum(dim=-1)
             # out_size = out_attw_b.sum(dim=-1)
 
+            P_qn = out_attw_b.clamp_min(1e-6)  # [Q, N]
+            logP_qn = P_qn.log()
+
             grouping_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             activity_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             # size_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
-            for i, out_attw_b_query in enumerate(out_attw_b):  # n_persons (can be regarded as cls) for certain query: multi cls classification for group
-                for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):  # n_persons (can be regarded as cls) for certain group
-                    grouping_cost[i][j] = F.binary_cross_entropy_with_logits(out_attw_b_query.float(), tgt_one_hot_b_group.float())  # direction: -> smaller cost  1.  multi cls(persons) classification for groups
-                    # activity_cost[i][j] = F.cross_entropy(out_activity_prob_b[i].float(), tgt_activity_ids_b[j])
-                    # activity_cost[i][j] = -out_activity_prob_b[i].float() * tgt_activity_ids_b[j] - (1 - out_activity_prob_b[i].float()) * (1 - tgt_activity_ids_b[j])  # direction: -> smaller cost  0.
-                    activity_cost[i][j] = F.binary_cross_entropy_with_logits(out_activity_prob_b[i].float(), tgt_activity_ids_b[j].float())
 
+            for j in range(n_group):
+                members = tgt_one_hot_b[j].bool()
+                m = int(members.sum().item())
+                if m == 0:
+                    grouping_cost[:, j] = 1e6
+                else:
+                    grouping_cost[:, j] = -logP_qn[:, members].mean(dim=1)
+                activity_cost[:, j] = F.cross_entropy(
+                    out_activity_prob_b,  # [num_queries, num_classes]
+                    tgt_activity_ids_b[j].expand(num_queries),  # [num_queries]
+                    reduction="none"
+                )
+
+            # for i, out_attw_b_query in enumerate(out_attw_b):  # n_persons (can be regarded as cls) for certain query: multi cls classification for group
+            #     for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):  # n_persons (can be regarded as cls) for certain group
+            #         grouping_cost[i][j] = torch.norm(out_attw_b_query.float() - tgt_one_hot_b_group.float(), p=2)
+            #         # grouping_cost[i][j] = F.binary_cross_entropy_with_logits(out_attw_b_query.float(), tgt_one_hot_b_group.float())  # direction: -> smaller cost  1.  multi cls(persons) classification for groups
+            #
+            #         # activity_cost[i][j] = F.cross_entropy(out_activity_prob_b[i].float(), tgt_activity_ids_b[j])
+            #         # activity_cost[i][j] = -out_activity_prob_b[i].float() * tgt_activity_ids_b[j] - (1 - out_activity_prob_b[i].float()) * (1 - tgt_activity_ids_b[j])  # direction: -> smaller cost  0.
+            #         activity_cost[i][j] = F.binary_cross_entropy_with_logits(out_activity_prob_b[i].float(), tgt_activity_ids_b_oh[j].float())
 
             cost_b = self.cost_bce * grouping_cost + self.cost_activity_class * activity_cost
             cost_b = cost_b.cpu().numpy()
