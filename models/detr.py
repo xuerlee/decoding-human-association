@@ -277,7 +277,7 @@ class SetCriterion(nn.Module):
 
         # loss -nll
         P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
-        logP_qn = F.log_softmax(P, dim=0)
+        logP_qn = F.log_softmax(P, dim=1)
         correct_prob = (logP_qn * target_one_hot.float()).sum(dim=1)  # [B, n_max] get the prob of the person belonging to the correct group
         correct_prob = correct_prob.clamp_min(1e-6)
         # valid_mask: [B, num_queries, n_max]
