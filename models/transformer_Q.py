@@ -87,8 +87,9 @@ class MultiheadAssignmentAttention(nn.Module):
         # weighted average over persons (N):
         # num: [B,H,Q,dh]
         num = torch.matmul(P, v)
-        den = P.sum(dim=-1, keepdim=True)  # [B,H,Q,1]
-        out = num / (den + self.eps)       # [B,H,Q,dh]
+        # den = P.sum(dim=-1, keepdim=True)  # [B,H,Q,1]
+        # out = num / (den + self.eps)       # [B,H,Q,dh]
+        out = num        # [B,H,Q,dh]
 
         # merge heads -> [B,Q,d] -> [Q,B,d]
         out = out.permute(0, 2, 1, 3).contiguous().view(B, Qlen, self.d_model)
