@@ -284,9 +284,14 @@ class SetCriterion(nn.Module):
         # loss_grouping = (-correct_prob[person_valid].log()).mean()
         loss_grouping = (-correct_prob[person_valid]).mean()
 
+        P_prob = logP_qn.exp()
+        entropy = -(P_prob * logP_qn).sum(dim=1)  # [B, N]
+        entropy_loss = entropy[person_valid].mean()
+
         losses = {}
         # losses['loss_grouping'] = loss_grouping.sum() / num_groups
-        losses['loss_grouping'] = loss_grouping
+        losses['loss_grouping'] = loss_grouping + 0.01 * entropy_loss
+
 
         return losses
 
