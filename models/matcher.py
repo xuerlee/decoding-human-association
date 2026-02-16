@@ -17,20 +17,20 @@ class HungarianMatcher(nn.Module):
     while the others are un-matched (and thus treated as empty groups).
     """
 
-    def __init__(self, cost_activity_class: float = 1, cost_action_class: float = 1, cost_bce: float = 1, cost_size: float = 1):
+    def __init__(self, cost_activity_class: float = 1, cost_action_class: float = 1, cost_group: float = 1, cost_size: float = 1):
         """Creates the matcher
 
         Params:
             cost_activity_class: This is the relative weight of the group activity classification error in the matching cost
             cost_action_class: This is the relative weight of the individual action classes consistency in the matching cost
-            cost_bce: This is the relative weight of the BCE error of one-hot grouping matrices and cross attention weights in the matching cost
+            cost_group: This is the relative weight of the cost of one-hot grouping matrices and cross attention weights in the matching cost
         """
         super().__init__()
         self.cost_activity_class = cost_activity_class
         self.cost_action_class = cost_action_class
-        self.cost_bce = cost_bce
+        self.cost_group = cost_group
         self.cost_size = cost_size
-        assert cost_activity_class != 0 or cost_action_class != 0 or cost_bce != 0 or cost_size != 0, "all costs cant be 0"
+        assert cost_activity_class != 0 or cost_action_class != 0 or cost_group != 0 or cost_size != 0, "all costs cant be 0"
 
     @torch.no_grad()
     def forward(self, outputs, targets):
@@ -117,7 +117,7 @@ class HungarianMatcher(nn.Module):
             #         # activity_cost[i][j] = -out_activity_prob_b[i].float() * tgt_activity_ids_b[j] - (1 - out_activity_prob_b[i].float()) * (1 - tgt_activity_ids_b[j])  # direction: -> smaller cost  0.
             #         activity_cost[i][j] = F.binary_cross_entropy_with_logits(out_activity_prob_b[i].float(), tgt_activity_ids_b_oh[j].float())
 
-            cost_b = self.cost_bce * grouping_cost + self.cost_activity_class * activity_cost
+            cost_b = self.cost_group * grouping_cost + self.cost_activity_class * activity_cost
             cost_b = cost_b.cpu().numpy()
             indices_b = linear_sum_assignment(cost_b)
             indices.append(indices_b)  # indices: B, 2 (prediction_id, target_id), num_groups
@@ -126,4 +126,4 @@ class HungarianMatcher(nn.Module):
 
 def build_matcher(args):
     # TODO: ADD cost_action
-    return HungarianMatcher(cost_activity_class=args.set_cost_activity_class, cost_action_class=args.set_cost_action_class, cost_bce=args.set_cost_bce, cost_size=args.set_cost_size)
+    return HungarianMatcher(cost_activity_class=args.set_cost_activity_class, cost_action_class=args.set_cost_action_class, cost_group=args.set_cost_group, cost_size=args.set_cost_size)

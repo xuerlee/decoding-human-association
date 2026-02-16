@@ -63,8 +63,8 @@ def get_args_parser():
                         help="Group activity class coefficient in the matching cost")
     parser.add_argument('--set_cost_action_class', default=2, type=float,
                         help="Individual action consistence coefficient in the matching cost")
-    parser.add_argument('--set_cost_bce', default=2, type=float,
-                        help="BCE error between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
+    parser.add_argument('--set_cost_group', default=2, type=float,
+                        help="cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
     parser.add_argument('--set_cost_size', default=3, type=float,
                         help="L1 cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
 
