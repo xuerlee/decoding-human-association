@@ -61,7 +61,7 @@ def get_args_parser():
                         help="Group activity class coefficient in the matching cost")
     parser.add_argument('--set_cost_action_class', default=2, type=float,
                         help="Individual action consistence coefficient in the matching cost")
-    parser.add_argument('--set_cost_bce', default=2, type=float,
+    parser.add_argument('--set_cost_group', default=2, type=float,
                         help="BCE error between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
     parser.add_argument('--set_cost_size', default=3, type=float,
                         help="L1 cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
@@ -78,8 +78,8 @@ def get_args_parser():
     parser.add_argument('--dataset',
                         # default='collective',
                         # default='volleyball',
-                        default='jrdb',
-                        # default='jrdb_group',
+                        # default='jrdb',
+                        default='jrdb_group',
                         # default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--cafe_split',
@@ -92,25 +92,25 @@ def get_args_parser():
     parser.add_argument('--img_path',
                         # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
                         # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
-                        # default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/images',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
+                        default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/images',
                         # default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
                         type=str)
     parser.add_argument('--ann_path',
                         # default='/home/jiqqi/data/social_CAD/anns',
                         # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
-                        # default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/labels/labels_2d',
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
+                        default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/labels/labels_2d',
                         # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
     parser.add_argument('--jrdb_detection_path',
-                        default='/media/jiqqi/新加卷/dataset/JRDB/train_images/detections_2d')
-                        # default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/detections_2d')
+                        # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/detections_2d')
+                        default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/detections_2d')
     parser.add_argument('--is_training', default=True, type=bool,
                         help='data preparation may have differences')
-    parser.add_argument('--img_w', default=1280, type=int,
+    parser.add_argument('--img_w', default=752, type=int,
                         help='width of resized images')
-    parser.add_argument('--img_h', default=720, type=int,
+    parser.add_argument('--img_h', default=480, type=int,
                         help='heigh of resized images')
     parser.add_argument('--num_frames', default=10, type=int,
                         help='number of stacked frame features')
@@ -119,7 +119,7 @@ def get_args_parser():
     parser.add_argument('--roi_align', default=[7, 7], type=int,  # openpifpaf output
                         help='size of roi_align')
 
-    parser.add_argument('--output_dir', default='output_imgs/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdb_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR',
+    parser.add_argument('--output_dir', default='output_imgs/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdbgroup_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR_TransQ_noscalenorm_001entropy_trainset',
                         help='path where to save, empty for no saving')
     parser.add_argument('--runs_dir', default='runs/test',
                         help='path where to save, empty for no saving')
@@ -129,7 +129,8 @@ def get_args_parser():
     parser.add_argument('--resume',
                         # default='output_dir/restartall_hidden256_enc2dec2_lossratio223_1frame_kinetic400/checkpoint0250.pth',
                         # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_cafe_fullonehot_kinetics_sampleequal_CyclicLR_place/checkpoint0010.pth',
-                        default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdb_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR/checkpoint0029.pth',
+                        # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdb_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR/checkpoint0029.pth',
+                        default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdbgroup_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR_TransQ_noscalenorm_001entropy/checkpoint0021.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
