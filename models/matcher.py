@@ -87,21 +87,26 @@ class HungarianMatcher(nn.Module):
             # tgt_size = tgt_one_hot_b.sum(dim=-1)
             # out_size = out_attw_b.sum(dim=-1)
 
-            # P_qn = out_attw_b.clamp_min(1e-6)  # [Q, N]
+            # P_qn = out_attw_b.clamp_min(1e-6)
             # logP_qn = P_qn.log()
-            logP_qn = F.log_softmax(out_attw_b, dim=0)
+            logP_qn = F.log_softmax(out_attw_b, dim=0)  # num_queries, n_persons
+            P_qn = logP_qn.exp()
 
             grouping_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             activity_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
-            # size_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
+            size_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
+
+            pred_size = P_qn.sum(dim=1)   # num_queries
 
             for j in range(n_group):
-                members = tgt_one_hot_b[j].bool()
+                members = tgt_one_hot_b[j].bool()  # tgt_one_hot_b[j] [n_persons]
                 m = int(members.sum().item())
                 if m == 0:
                     grouping_cost[:, j] = 1e6
-                else:
-                    grouping_cost[:, j] = -logP_qn[:, members].mean(dim=1)
+                    size_cost[:, j] = 1e6
+                else:  # grouping_cost[:, j]: num_queries; logP_qn: [num_queries, n_persons]
+                    grouping_cost[:, j] = -logP_qn[:, members].mean(dim=1)  # cost between each query and a certain group, members are the ground truth of this certain group
+                    size_cost[:, j] = (pred_size - float(m)).abs() / max(float(n_person), 1.0)
                 activity_cost[:, j] = F.cross_entropy(
                     out_activity_prob_b,  # [num_queries, num_classes]
                     tgt_activity_ids_b[j].expand(num_queries),  # [num_queries]
@@ -117,7 +122,7 @@ class HungarianMatcher(nn.Module):
             #         # activity_cost[i][j] = -out_activity_prob_b[i].float() * tgt_activity_ids_b[j] - (1 - out_activity_prob_b[i].float()) * (1 - tgt_activity_ids_b[j])  # direction: -> smaller cost  0.
             #         activity_cost[i][j] = F.binary_cross_entropy_with_logits(out_activity_prob_b[i].float(), tgt_activity_ids_b_oh[j].float())
 
-            cost_b = self.cost_group * grouping_cost + self.cost_activity_class * activity_cost
+            cost_b = self.cost_group * grouping_cost + self.cost_activity_class * activity_cost + self.cost_size * size_cost
             cost_b = cost_b.cpu().numpy()
             indices_b = linear_sum_assignment(cost_b)
             indices.append(indices_b)  # indices: B, 2 (prediction_id, target_id), num_groups

@@ -277,8 +277,8 @@ class SetCriterion(nn.Module):
 
         # loss -nll
         P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
-        logP_qn = F.log_softmax(P, dim=1)  # over Q
-        correct_prob = (logP_qn * target_one_hot.float()).sum(dim=1)  # [B, n_max] get the logprob of the person belonging to the correct group
+        logP_qn = F.log_softmax(P, dim=1)  # softmax over Q, [B, num_queries (sumP = 1), n_max]
+        correct_prob = (logP_qn * target_one_hot.float()).sum(dim=1)  # [B, n_max] get the logprob of the person belonging to the correct group, the others are 0
         # valid_mask: [B, num_queries, n_max]
         person_valid = valid_mask.any(dim=1)  # [B, n_max] if False: the person is dummy which is not included in any group
         # loss_grouping = (-correct_prob[person_valid].log()).mean()

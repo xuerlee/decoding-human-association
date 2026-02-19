@@ -61,7 +61,7 @@ def get_args_parser():
     # * Matcher
     parser.add_argument('--set_cost_activity_class', default=0, type=float,
                         help="Group activity class coefficient in the matching cost")
-    parser.add_argument('--set_cost_action_class', default=2, type=float,
+    parser.add_argument('--set_cost_action_class', default=0, type=float,
                         help="Individual action consistence coefficient in the matching cost")
     parser.add_argument('--set_cost_group', default=2, type=float,
                         help="cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
