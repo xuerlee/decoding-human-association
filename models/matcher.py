@@ -92,6 +92,9 @@ class HungarianMatcher(nn.Module):
             logP_qn = F.log_softmax(out_attw_b, dim=0)  # num_queries, n_persons
             P_qn = logP_qn.exp()
 
+            P_qn_clamped = P_qn.clamp(min=1e-6, max=1 - 1e-6)
+            lognegP_qn = torch.log1p(-P_qn_clamped)  # num_queries, n_persons
+
             grouping_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             activity_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
             size_cost = torch.zeros(num_queries, n_group, device=out_attw.device)
@@ -100,12 +103,14 @@ class HungarianMatcher(nn.Module):
 
             for j in range(n_group):
                 members = tgt_one_hot_b[j].bool()  # tgt_one_hot_b[j] [n_persons]
+                nonmembers = ~tgt_one_hot_b[j].bool()
                 m = int(members.sum().item())
                 if m == 0:
                     grouping_cost[:, j] = 1e6
                     size_cost[:, j] = 1e6
                 else:  # grouping_cost[:, j]: num_queries; logP_qn: [num_queries, n_persons]
-                    grouping_cost[:, j] = -logP_qn[:, members].mean(dim=1)  # cost between each query and a certain group, members are the ground truth of this certain group
+                    # grouping_cost[:, j] = -logP_qn[:, members].mean(dim=1)  # cost between each query and a certain group, members are the ground truth of this certain group
+                    grouping_cost[:, j] = -(logP_qn[:, members]).mean(dim=1) - (lognegP_qn[:, nonmembers]).mean(dim=1)
                     size_cost[:, j] = (pred_size - float(m)).abs() / max(float(n_person), 1.0)
                 activity_cost[:, j] = F.cross_entropy(
                     out_activity_prob_b,  # [num_queries, num_classes]
