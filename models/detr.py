@@ -341,7 +341,7 @@ class SetCriterion(nn.Module):
         n_person_b = valid_mask.any(dim=1).sum(dim=-1).clamp_min(1).float()
         loss_group_size = loss_group_size / n_person_b[batch_ids]
         loss_group_size = loss_group_size.mean()
-        print('size', loss_group_size)
+        # print('size', loss_group_size)
         losses = {}
         losses['loss_group_size'] = loss_group_size
 
