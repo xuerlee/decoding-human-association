@@ -242,7 +242,7 @@ class SetCriterion(nn.Module):
         return losses
 
     def loss_grouping(self, outputs, targets, indices, num_groups):
-        """Compute the losses related to the grouping results, using the binary cross entropy loss
+        """Compute the losses related to the grouping results
         """
         assert 'attention_logits' in outputs
         src_aw = outputs['attention_logits']  # B, n_max, num_queries
@@ -281,7 +281,7 @@ class SetCriterion(nn.Module):
 
         P_qn = logP_qn.exp()
         P_qn_clamped = P_qn.clamp(min=1e-6, max=1 - 1e-6)
-        lognegP_qn = torch.log1p(-P_qn_clamped)  # num_queries, n_persons
+        lognegP_qn = torch.log1p(-P_qn_clamped)  # B, num_queries, n_persons
 
         # correct_prob = (logP_qn * target_one_hot.float()).sum(dim=1)  # [B, n_max] get the logprob of the person belonging to the correct group, the others are 0
         all_prob = logP_qn * target_one_hot.float() + lognegP_qn * (1 - target_one_hot.float())  # do not need to use sum to select the correct group
@@ -289,16 +289,61 @@ class SetCriterion(nn.Module):
         person_valid = valid_mask.any(dim=1)  # [B, n_max] if False: the person is dummy which is not included in any group
         # loss_grouping = (-correct_prob[person_valid].log()).mean()
         # loss_grouping = (-correct_prob[person_valid]).mean()
-        loss_grouping = (-all_prob[valid_mask]).mean()
+        loss_grouping = (-all_prob[valid_mask]).mean()  # valid mask: B, num_queries, n_max
 
         P_prob = logP_qn.exp()
         entropy = -(P_prob * logP_qn).sum(dim=1)  # [B, N]
         entropy_loss = entropy[person_valid].mean()
-
+        print('grouping', loss_grouping)
         losses = {}
         # losses['loss_grouping'] = loss_grouping.sum() / num_groups
         losses['loss_grouping'] = loss_grouping + 0.01 * entropy_loss
 
+        return losses
+
+    def loss_group_size(self, outputs, targets, indices, num_groups):
+        """Compute the losses related to the grouping results
+        """
+        assert 'attention_logits' in outputs
+        src_aw = outputs['attention_logits']  # B, n_max, num_queries
+
+        tgt_one_hot_ini, mask_one_hot = targets[-1].decompose()  # B, n_max, num_groups_max
+        tgt_one_hot_ini = tgt_one_hot_ini.transpose(1, 2)  # B, num_groups_max, n_max  # regard persons as cls
+        mask_one_hot = mask_one_hot.transpose(1, 2)  # B, num_groups_max, n_max
+
+        idx = self._get_src_permutation_idx(indices)
+        target_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(tgt_one_hot_ini, indices)])  # t: tgt_activity_ids_b; J: macthed_tgt_id for each batch (change orders to match the prediction)
+        target_one_hot = torch.full(src_aw.shape, 0,
+                                    dtype=torch.int, device=src_aw.device)
+        target_one_hot = target_one_hot.transpose(1, 2)  # B, num_queries, n_max
+        target_one_hot[idx] = target_one_hot_o  # targrt_one_hot[batch_idx, src_idx] = targrt_one_hot_o  # B, num_queries, n_max
+
+        mask_one_hot = ~mask_one_hot
+        mask_one_hot_o = torch.cat([t[J] for t, (_, J) in zip(mask_one_hot, indices)])
+        valid_mask = torch.full(src_aw.shape, False, dtype=torch.bool, device=src_aw.device)
+        valid_mask = valid_mask.transpose(1, 2)   # B, num_queries, n_max
+        valid_mask[idx] = mask_one_hot_o
+
+        # loss -nll
+        P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
+        P_qn = F.softmax(P, dim=1)  # softmax over Q, [B, num_queries (sumP = 1), n_max]
+
+        V = valid_mask.float()
+        pred_size = (P_qn * V).sum(dim=-1)  # number of persons for each query
+        print(pred_size)
+        gt_size = (target_one_hot * V).sum(dim=-1)
+
+        pred_m = pred_size[idx]  # idx is src index
+        gt_m = gt_size[idx]
+        batch_ids = idx[0]
+
+        loss_group_size = (pred_m - gt_m).abs()
+        n_person_b = valid_mask.any(dim=1).sum(dim=-1).clamp_min(1).float()
+        loss_group_size = loss_group_size / n_person_b[batch_ids]
+        loss_group_size = loss_group_size.mean()
+        print('size', loss_group_size)
+        losses = {}
+        losses['loss_group_size'] = loss_group_size
 
         return losses
 
@@ -365,6 +410,7 @@ class SetCriterion(nn.Module):
             'action': self.loss_action_labels,
             'cardinality': self.loss_cardinality,
             'grouping': self.loss_grouping,
+            'size': self.loss_group_size,
             'consistency': self.loss_action_group_consistency,
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
@@ -477,7 +523,9 @@ def build(args):
         aux_loss=args.aux_loss,
     )
     matcher = build_matcher(args)
-    weight_dict = {'idv_loss_action': args.action_loss_coef, 'grp_loss_activity': args.activity_loss_coef, 'loss_grouping': args.grouping_loss_coef, 'loss_consistency': args.consistency_loss_coef}
+    weight_dict = {'idv_loss_action': args.action_loss_coef, 'grp_loss_activity': args.activity_loss_coef,
+                   'loss_grouping': args.grouping_loss_coef, 'loss_group_size': args.groupsize_loss_coef,
+                   'loss_consistency': args.consistency_loss_coef}
     if args.aux_loss:
         aux_weight_dict = {}
         for i in range(args.dec_layers - 1):
@@ -485,7 +533,8 @@ def build(args):
         weight_dict.update(aux_weight_dict)
 
     # losses = ['activity', 'grouping', 'action', 'cardinality', 'consistency']
-    losses = ['activity', 'grouping', 'action', 'cardinality']
+    # losses = ['activity', 'grouping', 'action', 'cardinality']
+    losses = ['activity', 'grouping', 'action', 'size', 'cardinality']
     # losses = ['activity', 'grouping', 'action']
     # losses = ['action']
     criterion = SetCriterion(args.dataset, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
