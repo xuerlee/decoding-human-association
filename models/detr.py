@@ -293,10 +293,10 @@ class SetCriterion(nn.Module):
         P_prob = logP_qn.exp()
         entropy = -(P_prob * logP_qn).sum(dim=1)  # [B, N]
         entropy_loss = entropy[person_valid].mean()
-        # print('grouping', loss_grouping)
         losses = {}
         # losses['loss_grouping'] = loss_grouping.sum() / num_groups
         losses['loss_grouping'] = loss_grouping + 0.01 * entropy_loss
+
 
         return losses
 
@@ -341,7 +341,6 @@ class SetCriterion(nn.Module):
         n_person_b = valid_mask.any(dim=1).sum(dim=-1).clamp_min(1).float()
         loss_group_size = loss_group_size / n_person_b[batch_ids]
         loss_group_size = loss_group_size.mean()
-        # print('size', loss_group_size)
         losses = {}
         losses['loss_group_size'] = loss_group_size
 
@@ -533,8 +532,8 @@ def build(args):
         weight_dict.update(aux_weight_dict)
 
     # losses = ['activity', 'grouping', 'action', 'cardinality', 'consistency']
-    losses = ['activity', 'grouping', 'action', 'cardinality']
-    # losses = ['activity', 'grouping', 'action', 'size', 'cardinality']
+    # losses = ['activity', 'grouping', 'action', 'cardinality']
+    losses = ['activity', 'grouping', 'action', 'size', 'cardinality']
     # losses = ['activity', 'grouping', 'action']
     # losses = ['action']
     criterion = SetCriterion(args.dataset, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
