@@ -108,8 +108,8 @@ class HungarianMatcher(nn.Module):
                     grouping_cost[:, j] = 1e6
                     size_cost[:, j] = 1e6
                 else:  # grouping_cost[:, j]: num_queries; logP_qn: [num_queries, n_persons]
-                    # grouping_cost[:, j] = -logP_qn[:, members].mean(dim=1)  # cost between each query and a certain group, members are the ground truth of this certain group
-                    grouping_cost[:, j] = -((logP_qn[:, members]).sum(dim=1) + (lognegP_qn[:, nonmembers]).sum(dim=1)) / n_person
+                    grouping_cost[:, j] = -logP_qn[:, members].mean(dim=1)  # cost between each query and a certain group, members are the ground truth of this certain group
+                    # grouping_cost[:, j] = -((logP_qn[:, members]).sum(dim=1) + (lognegP_qn[:, nonmembers]).sum(dim=1)) / n_person
                     size_cost[:, j] = (pred_size - float(m)).abs() / max(float(n_person), 1.0)
                 activity_cost[:, j] = F.cross_entropy(
                     out_activity_prob_b,  # [num_queries, num_classes]
