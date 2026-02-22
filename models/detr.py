@@ -278,7 +278,6 @@ class SetCriterion(nn.Module):
         # loss -nll
         P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
         logP_qn = F.log_softmax(P, dim=1)  # softmax over Q, [B, num_queries (sumP = 1), n_max]
-
         P_qn = logP_qn.exp()
         P_qn_clamped = P_qn.clamp(min=1e-6, max=1 - 1e-6)
         lognegP_qn = torch.log1p(-P_qn_clamped)  # B, num_queries, n_persons
@@ -294,7 +293,7 @@ class SetCriterion(nn.Module):
         P_prob = logP_qn.exp()
         entropy = -(P_prob * logP_qn).sum(dim=1)  # [B, N]
         entropy_loss = entropy[person_valid].mean()
-        print('grouping', loss_grouping)
+        # print('grouping', loss_grouping)
         losses = {}
         # losses['loss_grouping'] = loss_grouping.sum() / num_groups
         losses['loss_grouping'] = loss_grouping + 0.01 * entropy_loss
@@ -326,11 +325,12 @@ class SetCriterion(nn.Module):
 
         # loss -nll
         P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
+        # print('P', P)
         P_qn = F.softmax(P, dim=1)  # softmax over Q, [B, num_queries (sumP = 1), n_max]
-
+        # print('P_qn', P_qn)
         V = valid_mask.float()
         pred_size = (P_qn * V).sum(dim=-1)  # number of persons for each query
-        print(pred_size)
+        # print('pred_size', pred_size)
         gt_size = (target_one_hot * V).sum(dim=-1)
 
         pred_m = pred_size[idx]  # idx is src index
@@ -533,8 +533,8 @@ def build(args):
         weight_dict.update(aux_weight_dict)
 
     # losses = ['activity', 'grouping', 'action', 'cardinality', 'consistency']
-    # losses = ['activity', 'grouping', 'action', 'cardinality']
-    losses = ['activity', 'grouping', 'action', 'size', 'cardinality']
+    losses = ['activity', 'grouping', 'action', 'cardinality']
+    # losses = ['activity', 'grouping', 'action', 'size', 'cardinality']
     # losses = ['activity', 'grouping', 'action']
     # losses = ['action']
     criterion = SetCriterion(args.dataset, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,

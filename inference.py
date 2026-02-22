@@ -70,6 +70,7 @@ def get_args_parser():
     parser.add_argument('--action_loss_coef', default=2, type=float)
     parser.add_argument('--activity_loss_coef', default=2, type=float)
     parser.add_argument('--grouping_loss_coef', default=3, type=float)
+    parser.add_argument('--groupsize_loss_coef', default=1, type=float)
     parser.add_argument('--consistency_loss_coef', default=2, type=float)
     parser.add_argument('--eos_coef', default=0.1, type=float,
                         help="Relative classification weight of the no-object classes (empty groups)")
@@ -119,7 +120,7 @@ def get_args_parser():
     parser.add_argument('--roi_align', default=[7, 7], type=int,  # openpifpaf output
                         help='size of roi_align')
 
-    parser.add_argument('--output_dir', default='output_imgs/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdbgroup_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR_TransQ_noscalenorm_001entropy_trainset',
+    parser.add_argument('--output_dir', default='output_imgs/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdbgroup_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR_TransQ_noscalenorm_001entropy_grpcostonly_trainset',
                         help='path where to save, empty for no saving')
     parser.add_argument('--runs_dir', default='runs/test',
                         help='path where to save, empty for no saving')
@@ -130,7 +131,7 @@ def get_args_parser():
                         # default='output_dir/restartall_hidden256_enc2dec2_lossratio223_1frame_kinetic400/checkpoint0250.pth',
                         # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_cafe_fullonehot_kinetics_sampleequal_CyclicLR_place/checkpoint0010.pth',
                         # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdb_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR/checkpoint0029.pth',
-                        default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdbgroup_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR_TransQ_noscalenorm_001entropy/checkpoint0021.pth',
+                        default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdbgroup_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR_TransQ_noscalenorm_001entropy_grpcostonly/checkpoint0043.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')

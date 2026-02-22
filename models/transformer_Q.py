@@ -81,6 +81,7 @@ class MultiheadAssignmentAttention(nn.Module):
         # if all queries are -inf for a padded person, softmax gives NaN; force padded persons to 0
         if key_padding_mask is not None:
             P = P.masked_fill(key_padding_mask[:, None, None, :], 0.0)
+            scores = scores.masked_fill(key_padding_mask[:, None, None, :], 0.0)
 
         P = self.dropout(P)
 

@@ -79,8 +79,7 @@ class HungarianMatcher(nn.Module):
             n_group = len(tgt_activity_ids_b)
             n_person = tgt_one_hot_b.shape[0]
             out_activity_prob_b = out_activity_prob[b]  # [num_queries, num_classes]
-            out_attw_b = out_attw[b][0: n_person, :]  # [num_persons, num_queries]
-
+            out_attw_b = out_attw[b][0: n_person, :]  # [num_persons, num_queries]  # remove the person padding
             tgt_one_hot_b = tgt_one_hot_b.T  # num_groups, n_persons
             out_attw_b = out_attw_b.T  # num_queries, n_persons
 
