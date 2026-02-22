@@ -427,8 +427,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     criterion.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
-    metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
 
@@ -525,8 +525,8 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         pred_groups_scores_all = defaultdict(list)
 
     metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
-    metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Test:'
 
     for iteration, (samples, targets, meta) in enumerate(metric_logger.log_every(data_loader, 10, header)):
