@@ -533,9 +533,10 @@ def build(args):
 
     # losses = ['activity', 'grouping', 'action', 'cardinality', 'consistency']
     # losses = ['activity', 'grouping', 'action', 'cardinality']
-    losses = ['activity', 'grouping', 'action', 'size', 'cardinality']
+    # losses = ['activity', 'grouping', 'action', 'size', 'cardinality']
     # losses = ['activity', 'grouping', 'action']
     # losses = ['action']
+    losses = ['grouping', 'size']
     criterion = SetCriterion(args.dataset, num_action_classes, num_activity_classes, matcher=matcher, weight_dict=weight_dict,
                              eos_coef=args.eos_coef, losses=losses)
     criterion.to(device)

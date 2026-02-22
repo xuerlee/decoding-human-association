@@ -470,13 +470,11 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         if writer is not None:
             global_step = epoch * len(data_loader) + iteration
             writer.add_scalar('Loss/total', loss_value, global_step)
-
             for k, v in loss_dict_reduced_scaled.items():
                 if k.startswith('idv_action_class_error_') or k.startswith('grp_activity_class_error_'):
                     writer.add_scalar(f'Loss_scaled/{k}', v, global_step)
                 else:
                     writer.add_scalar(f'Loss_scaled/{k}', v.item(), global_step)
-
             for k, v in loss_dict_reduced_unscaled.items():
                 if k.startswith('idv_action_class_error_') or k.startswith('grp_activity_class_error_'):
                     writer.add_scalar(f'Loss_unscaled/{k}', v, global_step)
