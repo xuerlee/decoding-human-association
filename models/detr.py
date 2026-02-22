@@ -287,8 +287,8 @@ class SetCriterion(nn.Module):
         # valid_mask: [B, num_queries, n_max]
         person_valid = valid_mask.any(dim=1)  # [B, n_max] if False: the person is dummy which is not included in any group
         # loss_grouping = (-correct_prob[person_valid].log()).mean()
-        loss_grouping = (-correct_prob[person_valid]).mean()
-        # loss_grouping = (-all_prob[valid_mask]).mean()  # valid mask: B, num_queries, n_max
+        # loss_grouping = (-correct_prob[person_valid]).mean()
+        loss_grouping = (-all_prob[valid_mask]).mean()  # valid mask: B, num_queries, n_max
 
         P_prob = logP_qn.exp()
         entropy = -(P_prob * logP_qn).sum(dim=1)  # [B, N]

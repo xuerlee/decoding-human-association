@@ -65,7 +65,7 @@ def get_args_parser():
                         help="Individual action consistence coefficient in the matching cost")
     parser.add_argument('--set_cost_group', default=2, type=float,
                         help="cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
-    parser.add_argument('--set_cost_size', default=0, type=float,
+    parser.add_argument('--set_cost_size', default=3, type=float,
                         help="L1 cost between one-hot grouping matrices and cross attention weights coefficient in the matching cost")
 
     # * Loss coefficients
