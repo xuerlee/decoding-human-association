@@ -411,8 +411,8 @@ def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Modu
                 else:
                     writer.add_scalar(f'Loss_unscaled/{k}', v.item(), global_step)
 
-            writer.add_scalar('Error/grp_activity_class_error', loss_dict_reduced['grp_activity_class_error'], global_step)
-            writer.add_scalar('Error/idv_action_class_error', loss_dict_reduced['idv_action_class_error'], global_step)
+            # writer.add_scalar('Error/grp_activity_class_error', loss_dict_reduced['grp_activity_class_error'], global_step)
+            # writer.add_scalar('Error/idv_action_class_error', loss_dict_reduced['idv_action_class_error'], global_step)
             writer.add_scalar('LR', optimizer.param_groups[0]["lr"], global_step)
 
     # gather the stats from all processes
@@ -481,8 +481,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 else:
                     writer.add_scalar(f'Loss_unscaled/{k}', v.item(), global_step)
 
-            writer.add_scalar('Error/grp_activity_class_error', loss_dict_reduced['grp_activity_class_error'], global_step)
-            writer.add_scalar('Error/idv_action_class_error', loss_dict_reduced['idv_action_class_error'], global_step)
+            # writer.add_scalar('Error/grp_activity_class_error', loss_dict_reduced['grp_activity_class_error'], global_step)
+            # writer.add_scalar('Error/idv_action_class_error', loss_dict_reduced['idv_action_class_error'], global_step)
             writer.add_scalar('LR', optimizer.param_groups[0]["lr"], global_step)
 
     # gather the stats from all processes
