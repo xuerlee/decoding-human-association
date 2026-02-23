@@ -677,10 +677,17 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             ap_list = []
             for b in bucket_names:
                 recs = [r for r in all_records if r["bucket"] == b]
-                ap = ap_from_records(recs, npos_bucket[b])
+                npos = npos_bucket.get(b, 0)
+
+                ap = ap_from_records(recs, npos)
                 print(b, "AP:", ap)
-                ap_list.append(ap)
-            overall_ap = np.nanmean(ap_list)
+                if not np.isnan(ap):
+                    ap_list.append(ap)
+
+            if len(ap_list) > 0:
+                overall_ap = np.mean(ap_list)
+            else:
+                overall_ap = np.nan
             print("overall AP:", overall_ap)
 
             p, r, f1, (TP, FP, FN) = group_prf_eval(
