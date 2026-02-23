@@ -172,7 +172,7 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
             tp = 1 if (mapped is not None and mapped == gt_gid[p]) else 0
             bucket = bucket_from_size(gt_cnt[gt_gid[p]])
             records.append({"score": float(score[p].item()), "tp": tp, "bucket": bucket})
-            records.append({"score": float(score[p].item()), "tp": tp, "bucket": "overall"})
+            # records.append({"score": float(score[p].item()), "tp": tp, "bucket": "overall"})
 
     return records, npos_bucket
 
@@ -673,10 +673,15 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             print('CAD grouping accuracy: ', grouping_acc)
 
         elif dataset == 'jrdb' or dataset == 'jrdb_group':
-            for b in ["G1", "G2", "G3", "G4", "G5+", "overall"]:
+            bucket_names = ["G1", "G2", "G3", "G4", "G5+"]
+            ap_list = []
+            for b in bucket_names:
                 recs = [r for r in all_records if r["bucket"] == b]
                 ap = ap_from_records(recs, npos_bucket[b])
                 print(b, "AP:", ap)
+                ap_list.append(ap)
+            overall_ap = np.nanmean(ap_list)
+            print("overall AP:", overall_ap)
 
             p, r, f1, (TP, FP, FN) = group_prf_eval(
                 gt_groups_ids_all, pred_groups_ids_all,
