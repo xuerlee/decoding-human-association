@@ -191,11 +191,14 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
             tp = 1 if (mapped is not None and mapped == gt_gid[p]) else 0
 
             matched_query = map_gt2pred.get(g, None)
-            if matched_query is None:
-                # no predicted query matched to this GT group -> confidence should be 0
-                score = 0.0
-            else:
-                score = float(aw[p, matched_query].item())
+
+            # if matched_query is None:
+            #     # no predicted query matched to this GT group -> confidence should be 0
+            #     score = 0.0
+            # else:
+            #     score = float(aw[p, matched_query].item())
+
+            score = 1.0
 
             # bucket = bucket_from_size(gt_cnt[gt_gid[p]])
             bucket = bucket_from_size(gt_cnt[g])
