@@ -41,7 +41,7 @@ Activity_names = ['walking', 'standing', 'sitting', 'cycling', 'going upstairs',
 # is identical to the person’s individual actions."
 
 def jrdb_path(img_root, ann_root):
-    val_seqs = [
+    train_seqs = [
         "tressider-2019-03-16_0",
         "svl-meeting-gates-2-2019-04-08_1",
         "svl-meeting-gates-2-2019-04-08_0",
@@ -63,7 +63,7 @@ def jrdb_path(img_root, ann_root):
         "clark-center-2019-02-28_0",
         "bytes-cafe-2019-02-07_0",
     ]
-    train_seqs = [
+    val_seqs = [
         "clark-center-2019-02-28_1",
         "gates-ai-lab-2019-02-08_0",
         "huang-2-2019-01-25_0",
