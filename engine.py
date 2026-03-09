@@ -19,6 +19,15 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 from evaluation.cafe_eval import group_mAP_eval, outlier_metric_from_onehot, outlier_metric, calculateAveragePrecision
 
+# collective:
+# action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
+# activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
+# volleyball:
+# action_names = ['blocking', 'digging', 'falling', 'jumping',
+#                 'moving', 'setting', 'spiking', 'standing',
+#                 'waiting']
+# activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
+#                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
 # class name lists are only used for confusion matrix plotting / pretty printing
 _ACTION_ACTIVITY_NAMES = {
     "collective": (
@@ -723,6 +732,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                                           pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
                                           categories, thresh=0.5)
             outlier_from_onehot = outlier_metric_from_onehot(all_oh, all_aw)
+            _, activity_names = _names_for_dataset(dataset)
             num_class = len(activity_names)
             outlier = outlier_metric(gt_groups_ids_all, gt_groups_activity_all, pred_groups_ids_all, pred_groups_activity_all, num_class-1)
             print("CAFE group_mAP@1.0:", mAP10)
