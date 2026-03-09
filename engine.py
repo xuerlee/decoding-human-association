@@ -28,9 +28,34 @@ from evaluation.cafe_eval import group_mAP_eval, outlier_metric_from_onehot, out
 #                 'waiting']
 # activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
 #                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
-# cafe:
-action_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual']
-activity_names = ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual']
+# class name lists are only used for confusion matrix plotting / pretty printing
+_ACTION_ACTIVITY_NAMES = {
+    "collective": (
+        ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking'],
+        ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty'],
+    ),
+    "volleyball": (
+        ['blocking', 'digging', 'falling', 'jumping', 'moving', 'setting', 'spiking', 'standing', 'waiting'],
+        ['r_set', 'r_spike', 'r-pass', 'r_winpoint', 'l_set', 'l-spike', 'l-pass', 'l_winpoint'],
+    ),
+    "cafe": (
+        ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual'],
+        ['Queueing', 'Ordering', 'Eating/Drinking', 'Working/Studying', 'Fighting', 'TakingSelfie', 'Individual'],
+    ),
+    # jrdb_simplified used in dataset/JRDB.py
+    "jrdb": (
+        ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying'],
+        ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying'],
+    ),
+    "jrdb_group": (
+        ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying'],
+        ['walking', 'standing', 'sitting', 'cycling', 'going upstairs', 'bending', 'going downstairs', 'skating', 'scootering', 'running', 'lying'],
+    ),
+}
+
+
+def _names_for_dataset(dataset: str):
+    return _ACTION_ACTIVITY_NAMES.get(dataset, (None, None))
 # jrdb:
 # action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
 #                 'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
@@ -550,7 +575,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         # metric_logger.update(grp_activity_class_error=loss_dict_reduced['grp_activity_class_error'])
         # metric_logger.update(idv_action_class_error=loss_dict_reduced['idv_action_class_error'])
         for k, v in loss_dict_reduced.items():
-            if k.startswith('idv_action_class_error_') or k.startswith('grp_activity_class_error_') and v is not None:
+            if (k.startswith('idv_action_class_error_') or k.startswith('grp_activity_class_error_')) and v is not None:
                 metric_logger.update(**{k: v})
 
         # for final evaluation
@@ -724,8 +749,14 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             print("group_F1@0.5:", f1)
 
 
-        # confusion matrix
-        utils.plot_confusion_matrix(all_action_gts, all_action_preds, save_path, class_names=action_names)
+        # confusion matrix (labels depend on dataset)
+        ds_action_names, _ = _names_for_dataset(dataset)
+        utils.plot_confusion_matrix(
+            all_action_gts,
+            all_action_preds,
+            save_path,
+            class_names=ds_action_names,
+        )
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
