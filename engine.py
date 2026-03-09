@@ -370,7 +370,7 @@ def group_prf_eval_old(gt_groups_ids, pred_groups_ids, thresh=0.5, min_group_siz
     return precision * 100.0, recall * 100.0, f1 * 100.0, (TP, FP, FN)
 
 
-def group_prf_eval_same_as_old_eval(
+def group_prf_eval(
     gt_groups_ids,
     pred_groups_ids,
     thresh=0.5,
