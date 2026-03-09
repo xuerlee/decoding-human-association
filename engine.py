@@ -19,15 +19,6 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 from evaluation.cafe_eval import group_mAP_eval, outlier_metric_from_onehot, outlier_metric, calculateAveragePrecision
 
-# collective:
-# action_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking']
-# activity_names = ['none', 'Crossing', 'Waiting', 'Queuing', 'Walking', 'Talking', 'Empty']
-# volleyball:
-# action_names = ['blocking', 'digging', 'falling', 'jumping',
-#                 'moving', 'setting', 'spiking', 'standing',
-#                 'waiting']
-# activity_names = ['r_set', 'r_spike', 'r-pass', 'r_winpoint',
-#                   'l_set', 'l-spike', 'l-pass', 'l_winpoint']
 # class name lists are only used for confusion matrix plotting / pretty printing
 _ACTION_ACTIVITY_NAMES = {
     "collective": (
