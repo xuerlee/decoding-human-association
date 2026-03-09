@@ -300,7 +300,7 @@ def group_overlap_maxnorm(det_members, gt_members):
     return 0.0 if denom == 0 else inter / denom
 
 
-def group_prf_eval(gt_groups_ids, pred_groups_ids, thresh=0.5, min_group_size=2, ignore_pred_gid_minus1=True):
+def group_prf_eval_old(gt_groups_ids, pred_groups_ids, thresh=0.5, min_group_size=2, ignore_pred_gid_minus1=True):
     """
     Evaluate group detection P/R/F1 following:
       TP if max_gt |inter| / max(|det|,|gt|) > thresh, with 1-1 matching.
@@ -369,6 +369,116 @@ def group_prf_eval(gt_groups_ids, pred_groups_ids, thresh=0.5, min_group_size=2,
 
     return precision * 100.0, recall * 100.0, f1 * 100.0, (TP, FP, FN)
 
+
+def group_prf_eval_same_as_old_eval(
+    gt_groups_ids,
+    pred_groups_ids,
+    thresh=0.5,
+    min_group_size=2,
+    ignore_pred_gid_minus1=True,
+    crit="half",
+):
+    """
+    Evaluate group detection P/R/F1 using the SAME LOGIC as the old Evaluation.group_eval:
+      - no 1-to-1 matching
+      - for every GT group and every predicted group, if overlap > threshold, TP += 1
+      - FP = num_pred_groups - TP
+      - FN = num_gt_groups - TP
+
+    Args:
+        gt_groups_ids:   dict clip_key -> [ {gt_gid: [person_ids]} ]
+        pred_groups_ids: dict clip_key -> [ {pred_gid: [person_ids]} ]
+        thresh: only used if crit is None; otherwise crit controls threshold
+        min_group_size: only evaluate groups with size >= min_group_size
+        ignore_pred_gid_minus1: whether to ignore gid == -1 in predictions
+        crit: "half", "card", "dpmm", "all"
+
+    Returns:
+        precision*100, recall*100, f1*100, (TP, FP, FN)
+    """
+    TP = 0
+    FP = 0
+    FN = 0
+
+    for clip_key in pred_groups_ids.keys():
+        if clip_key not in gt_groups_ids:
+            continue
+
+        gt_dict = gt_groups_ids[clip_key][0]     # {gid: [pids]}
+        pred_dict = pred_groups_ids[clip_key][0] # {gid: [pids]}
+
+        # filter GT groups
+        gt_groups = []
+        for gid, members in gt_dict.items():
+            if len(members) >= min_group_size:
+                gt_groups.append((gid, members))
+
+        # filter predicted groups
+        pred_groups = []
+        for gid, members in pred_dict.items():
+            if ignore_pred_gid_minus1 and gid == -1:
+                continue
+            if len(members) >= min_group_size:
+                pred_groups.append((gid, members))
+
+        num_GT = len(gt_groups)
+        num_GROUP = len(pred_groups)
+
+        # same logic as old Evaluation.group_eval:
+        # double loop over GT and pred, no one-to-one matching
+        TP_clip = 0
+        for ggid, gmembers in gt_groups:
+            gt_set = set(gmembers)
+            gt_card = len(gmembers)
+
+            for pgid, pmembers in pred_groups:
+                pred_set = set(pmembers)
+                pred_card = len(pmembers)
+
+                inters_card = len(gt_set & pred_set)
+
+                if crit == "half":
+                    if pred_card == 2 and gt_card == 2:
+                        if len(gt_set - pred_set) == 0:
+                            TP_clip += 1
+                    elif inters_card / max(gt_card, pred_card) > 1 / 2:
+                        TP_clip += 1
+
+                elif crit == "card":
+                    if pred_card == 2 and gt_card == 2:
+                        if len(gt_set - pred_set) == 0:
+                            TP_clip += 1
+                    elif inters_card / max(gt_card, pred_card) > 2 / 3:
+                        TP_clip += 1
+
+                elif crit == "dpmm":
+                    if pred_card == 2 and gt_card == 2:
+                        if len(gt_set - pred_set) == 0:
+                            TP_clip += 1
+                    elif inters_card / max(gt_card, pred_card) > 0.6:
+                        TP_clip += 1
+
+                elif crit == "all":
+                    if len(gt_set - pred_set) == 0:
+                        TP_clip += 1
+
+                else:
+                    # fallback: use thresh directly
+                    if group_overlap_maxnorm(pmembers, gmembers) > thresh:
+                        TP_clip += 1
+
+        FP_clip = num_GROUP - TP_clip
+        FN_clip = num_GT - TP_clip
+
+        TP += TP_clip
+        FP += FP_clip
+        FN += FN_clip
+
+    precision = TP / (TP + FP + 1e-8)
+    recall = TP / (TP + FN + 1e-8)
+    f1 = 0.0 if (precision + recall) == 0 else (2 * precision * recall / (precision + recall))
+
+    return precision * 100.0, recall * 100.0, f1 * 100.0, (TP, FP, FN)
 
 def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
