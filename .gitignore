@@ -15,3 +15,13 @@ experiment-*
 .mypy_cache/*
 not_tracked_dir/
 .vscode
+
+# experiment outputs / generated artifacts
+output_dir/
+output_imgs/
+runs/
+**/events.out.tfevents.*
+*.tfevents.*
+
+# IDE files
+.idea/
