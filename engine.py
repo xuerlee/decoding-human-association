@@ -480,6 +480,7 @@ def group_prf_eval(
 
     return precision * 100.0, recall * 100.0, f1 * 100.0, (TP, FP, FN)
 
+
 def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, writer, accum_steps: int, max_norm: float = 0):
@@ -837,6 +838,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
             print("group_F1@0.5:", f1)
 
         elif dataset == 'cafe':
+            _, activity_names = _names_for_dataset(dataset)
             categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
             mAP10, APs10 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
                                           pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
@@ -845,7 +847,6 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                                           pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
                                           categories, thresh=0.5)
             outlier_from_onehot = outlier_metric_from_onehot(all_oh, all_aw)
-            _, activity_names = _names_for_dataset(dataset)
             num_class = len(activity_names)
             outlier = outlier_metric(gt_groups_ids_all, gt_groups_activity_all, pred_groups_ids_all, pred_groups_activity_all, num_class-1)
             print("CAFE group_mAP@1.0:", mAP10)
