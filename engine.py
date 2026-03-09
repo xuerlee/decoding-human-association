@@ -159,7 +159,8 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
 
         # pred group per person + its confidence
         pred_gid = aw.argmax(dim=-1)
-        score = aw.max(dim=-1).values
+        # score = aw.max(dim=-1).values
+
 
         # build pred_group one-hot for matcher_eval
         pred_group = torch.zeros_like(aw)
@@ -169,6 +170,7 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
         out_ids, tgt_ids = matcher_eval(pred_group, oh)
         # mapping: pred_query -> gt_group
         map_pred2gt = {int(o): int(t) for o, t in zip(out_ids, tgt_ids)}
+        map_gt2pred = {int(t): int(o) for o, t in zip(out_ids, tgt_ids)}
 
         # -------- GT group sizes for bucketing (by GT groups) --------
         # gt group id per person = argmax over columns (because one-hot membership)
@@ -183,11 +185,21 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
         # -------- final TP/FP per person --------
         # person p is TP if mapped(pred_gid[p]) == gt_gid[p]
         for p in range(len(gt_gid)):
+            g = gt_gid[p]
             pg = int(pred_gid[p].item())
             mapped = map_pred2gt.get(pg, None)
             tp = 1 if (mapped is not None and mapped == gt_gid[p]) else 0
-            bucket = bucket_from_size(gt_cnt[gt_gid[p]])
-            records.append({"score": float(score[p].item()), "tp": tp, "bucket": bucket})
+
+            matched_query = map_gt2pred.get(g, None)
+            if matched_query is None:
+                # no predicted query matched to this GT group -> confidence should be 0
+                score = 0.0
+            else:
+                score = float(aw[p, matched_query].item())
+
+            # bucket = bucket_from_size(gt_cnt[gt_gid[p]])
+            bucket = bucket_from_size(gt_cnt[g])
+            records.append({"score": score, "tp": tp, "bucket": bucket})
             # records.append({"score": float(score[p].item()), "tp": tp, "bucket": "overall"})
 
     return records, npos_bucket
