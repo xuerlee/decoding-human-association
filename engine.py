@@ -170,7 +170,7 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
         out_ids, tgt_ids = matcher_eval(pred_group, oh)
         # mapping: pred_query -> gt_group
         map_pred2gt = {int(o): int(t) for o, t in zip(out_ids, tgt_ids)}
-        map_gt2pred = {int(t): int(o) for o, t in zip(out_ids, tgt_ids)}
+        # map_gt2pred = {int(t): int(o) for o, t in zip(out_ids, tgt_ids)}
 
         # -------- GT group sizes for bucketing (by GT groups) --------
         # gt group id per person = argmax over columns (because one-hot membership)
@@ -190,15 +190,15 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
             mapped = map_pred2gt.get(pg, None)
             tp = 1 if (mapped is not None and mapped == gt_gid[p]) else 0
 
-            matched_query = map_gt2pred.get(g, None)
+            # matched_query = map_gt2pred.get(g, None)
 
-            if matched_query is None:
-                # no predicted query matched to this GT group -> confidence should be 0
-                score = 0.0
-            else:
-                score = float(aw[p, matched_query].item())
+            # if matched_query is None:
+            #     # no predicted query matched to this GT group -> confidence should be 0
+            #     score = 0.0
+            # else:
+            #     score = float(aw[p, matched_query].item())
 
-            # score = 1.0
+            score = 1.0
 
             # bucket = bucket_from_size(gt_cnt[gt_gid[p]])
             bucket = bucket_from_size(gt_cnt[g])
@@ -209,22 +209,13 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
 
 
 def ap_from_records(records, npos):
-    if npos == 0:
-        return np.nan
     if len(records) == 0:
-        return 0.0
+        return np.nan
 
-    records = sorted(records, key=lambda x: -x["score"])
-    tp = np.array([r["tp"] for r in records], dtype=np.float32)
-    fp = 1.0 - tp
+    tp = sum(r["tp"] for r in records)
+    total = len(records)
 
-    acc_tp = np.cumsum(tp)
-    acc_fp = np.cumsum(fp)
-
-    rec = acc_tp / npos
-    prec = acc_tp / (acc_tp + acc_fp + 1e-8)
-
-    ap, _, _, _ = calculateAveragePrecision(rec.tolist(), prec.tolist())
+    ap = tp / (total + 1e-8)
     return ap * 100.0
 
 
