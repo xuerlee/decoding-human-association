@@ -276,23 +276,47 @@ class SetCriterion(nn.Module):
         # loss_grouping = F.cross_entropy(src_aw.transpose(1, 2), target_group)
 
         # loss -nll
+        # P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
+        # logP_qn = F.log_softmax(P, dim=1)  # softmax over Q, [B, num_queries (sumP = 1), n_max]
+        # P_qn = logP_qn.exp()
+        # P_qn_clamped = P_qn.clamp(min=1e-6, max=1 - 1e-6)
+        # lognegP_qn = torch.log1p(-P_qn_clamped)  # B, num_queries, n_persons
+        #
+        # correct_prob = (logP_qn * target_one_hot.float()).sum(dim=1)  # [B, n_max] get the logprob of the person belonging to the correct group, the others are 0
+        # all_prob = logP_qn * target_one_hot.float() + lognegP_qn * (1 - target_one_hot.float())  # do not need to use sum to select the correct group
+        #
+        # # valid_mask: [B, num_queries, n_max]
+        # person_valid = valid_mask.any(dim=1)  # [B, n_max] if False: the person is dummy which is not included in any group
+        # # loss_grouping = (-correct_prob[person_valid].log()).mean()
+        # # loss_grouping = (-correct_prob[person_valid]).mean()
+        # loss_grouping = (-all_prob[valid_mask]).mean()  # valid mask: B, num_queries, n_max
+        #
+        # P_prob = logP_qn.exp()
+        # entropy = -(P_prob * logP_qn).sum(dim=1)  # [B, N]
+        # entropy_loss = entropy[person_valid].mean()
+
+        # loss -nll
         P = src_aw.transpose(1, 2)  # [B, num_queries, n_max]
-        logP_qn = F.log_softmax(P, dim=1)  # softmax over Q, [B, num_queries (sumP = 1), n_max]
+        logP_qn = F.log_softmax(P, dim=1)
         P_qn = logP_qn.exp()
         P_qn_clamped = P_qn.clamp(min=1e-6, max=1 - 1e-6)
-        lognegP_qn = torch.log1p(-P_qn_clamped)  # B, num_queries, n_persons
+        lognegP_qn = torch.log1p(-P_qn_clamped)
 
-        correct_prob = (logP_qn * target_one_hot.float()).sum(dim=1)  # [B, n_max] get the logprob of the person belonging to the correct group, the others are 0
-        all_prob = logP_qn * target_one_hot.float() + lognegP_qn * (1 - target_one_hot.float())  # do not need to use sum to select the correct group
+        all_prob_valid = (logP_qn * target_one_hot.float() * valid_mask.float()
+                    + lognegP_qn * (1 - target_one_hot.float()) * valid_mask.float())  # [B, num_queries, n_max]
+
+        group_loss = -all_prob_valid.sum(dim=-1) / (valid_mask.float().sum(dim=-1) + 1e-6)  # [B, num_queries]
+
         # valid_mask: [B, num_queries, n_max]
-        person_valid = valid_mask.any(dim=1)  # [B, n_max] if False: the person is dummy which is not included in any group
-        # loss_grouping = (-correct_prob[person_valid].log()).mean()
-        # loss_grouping = (-correct_prob[person_valid]).mean()
-        loss_grouping = (-all_prob[valid_mask]).mean()  # valid mask: B, num_queries, n_max
+        group_valid = valid_mask.any(dim=-1)  # [B, num_queries]
+        loss_grouping = group_loss[group_valid].mean()
 
+        # entropy
         P_prob = logP_qn.exp()
         entropy = -(P_prob * logP_qn).sum(dim=1)  # [B, N]
+        person_valid = valid_mask.any(dim=1)
         entropy_loss = entropy[person_valid].mean()
+
         losses = {}
         # losses['loss_grouping'] = loss_grouping.sum() / num_groups
         losses['loss_grouping'] = loss_grouping + 0.01 * entropy_loss
