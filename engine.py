@@ -560,8 +560,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     criterion.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    # metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
-    # metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
 
@@ -594,8 +594,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         optimizer.step()
 
         metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
-        # metric_logger.update(grp_activity_class_error=loss_dict_reduced['grp_activity_class_error'])
-        # metric_logger.update(idv_action_class_error=loss_dict_reduced['idv_action_class_error'])
+        metric_logger.update(grp_activity_class_error=loss_dict_reduced['grp_activity_class_error'])
+        metric_logger.update(idv_action_class_error=loss_dict_reduced['idv_action_class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
         if writer is not None:
@@ -612,8 +612,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 else:
                     writer.add_scalar(f'Loss_unscaled/{k}', v.item(), global_step)
 
-            # writer.add_scalar('Error/grp_activity_class_error', loss_dict_reduced['grp_activity_class_error'], global_step)
-            # writer.add_scalar('Error/idv_action_class_error', loss_dict_reduced['idv_action_class_error'], global_step)
+            writer.add_scalar('Error/grp_activity_class_error', loss_dict_reduced['grp_activity_class_error'], global_step)
+            writer.add_scalar('Error/idv_action_class_error', loss_dict_reduced['idv_action_class_error'], global_step)
             writer.add_scalar('LR', optimizer.param_groups[0]["lr"], global_step)
 
     # gather the stats from all processes
@@ -659,8 +659,8 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         pred_groups_scores_all = defaultdict(list)
 
     metric_logger = utils.MetricLogger(delimiter="  ")
-    # metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
-    # metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('grp_activity_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('idv_action_class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Test:'
 
     for iteration, (samples, targets, meta) in enumerate(metric_logger.log_every(data_loader, 10, header)):
@@ -681,8 +681,8 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                              **loss_dict_reduced_unscaled)
 
         # TODO: grouping error
-        # metric_logger.update(grp_activity_class_error=loss_dict_reduced['grp_activity_class_error'])
-        # metric_logger.update(idv_action_class_error=loss_dict_reduced['idv_action_class_error'])
+        metric_logger.update(grp_activity_class_error=loss_dict_reduced['grp_activity_class_error'])
+        metric_logger.update(idv_action_class_error=loss_dict_reduced['idv_action_class_error'])
         for k, v in loss_dict_reduced.items():
             if (k.startswith('idv_action_class_error_') or k.startswith('grp_activity_class_error_')) and v is not None:
                 metric_logger.update(**{k: v})
@@ -790,10 +790,12 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
     overall_idv_action_error = 100 - overall_idv_action_acc * 100
     print('overall_idv_action_error: ', overall_idv_action_error)
+    stats.update({'overall_idv_action_error': overall_idv_action_error})
 
     overall_grp_activity_acc = (torch.as_tensor(all_activity_preds) == torch.as_tensor(all_activity_gts)).float().mean()
     overall_grp_activity_error = 100 - overall_grp_activity_acc * 100
     print('overall_grp_activity_error: ', overall_grp_activity_error)
+    stats.update({'overall_grp_activity_error': overall_grp_activity_error})
 
     if dataset == 'collective':
         membership_acc = 100 * (correct_memberships / overall_persons)
