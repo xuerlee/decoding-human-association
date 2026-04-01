@@ -75,13 +75,13 @@ class HungarianMatcher(nn.Module):
         for b in range(bs):
             tgt_activity_ids_b = tgt_activity_ids[b][valid_areas_ids[b][0]: valid_areas_ids[b][1]]  # [num_group]
             tgt_activity_ids_b_oh = F.one_hot(tgt_activity_ids_b, num_activity_classes)  # num_group, num_activity_cls
-            tgt_one_hot_b = tgt_one_hot[b][valid_areas_one_hot[b][0]: valid_areas_one_hot[b][1], valid_areas_one_hot[b][2]: valid_areas_one_hot[b][3]]  # n_persons, n_groups
+            tgt_one_hot_b_ini = tgt_one_hot[b][valid_areas_one_hot[b][0]: valid_areas_one_hot[b][1], valid_areas_one_hot[b][2]: valid_areas_one_hot[b][3]]  # n_persons, n_groups
             n_group = len(tgt_activity_ids_b)
-            n_person = tgt_one_hot_b.shape[0]
+            n_person = tgt_one_hot_b_ini.shape[0]
             out_activity_prob_b = out_activity_prob[b]  # [num_queries, num_classes]
-            out_attw_b = out_attw[b][0: n_person, :]  # [num_persons, num_queries]  # remove the person padding
-            tgt_one_hot_b = tgt_one_hot_b.T  # num_groups, n_persons
-            out_attw_b = out_attw_b.T  # num_queries, n_persons
+            out_attw_b_ini = out_attw[b][0: n_person, :]  # [num_persons, num_queries]  # remove the person padding
+            tgt_one_hot_b = tgt_one_hot_b_ini.T  # num_groups, n_persons
+            out_attw_b = out_attw_b_ini.T  # num_queries, n_persons
 
             # tgt_size = tgt_one_hot_b.sum(dim=-1)
             # out_size = out_attw_b.sum(dim=-1)
@@ -117,6 +117,25 @@ class HungarianMatcher(nn.Module):
                     reduction="none"
                 )
 
+            pred_gid = out_attw_b_ini.argmax(dim=-1)
+            pred_group = torch.zeros_like(out_attw_b_ini)
+            pred_group[torch.arange(n_person, device=out_attw_b_ini.device), pred_gid] = 1
+
+            pred_group_t = pred_group.T  # [num_queries, n_person]
+            tgt_group_t = tgt_one_hot_b_ini.T  # [n_group, n_person]
+
+            cost_iou = torch.zeros(num_queries, n_group, device=out_attw.device)
+            for i, pred_q in enumerate(pred_group_t):
+                pred_q_bool = pred_q.bool()
+                for j, tgt_g in enumerate(tgt_group_t):
+                    tgt_g_bool = tgt_g.bool()
+
+                    inter = (pred_q_bool & tgt_g_bool).sum().float()
+                    union = (pred_q_bool | tgt_g_bool).sum().float()
+                    iou = inter / (union + 1e-6)
+
+                    cost_iou[i, j] = 1.0 - iou
+
             # for i, out_attw_b_query in enumerate(out_attw_b):  # n_persons (can be regarded as cls) for certain query: multi cls classification for group
             #     for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):  # n_persons (can be regarded as cls) for certain group
             #         grouping_cost[i][j] = torch.norm(out_attw_b_query.float() - tgt_one_hot_b_group.float(), p=2)
@@ -126,7 +145,8 @@ class HungarianMatcher(nn.Module):
             #         # activity_cost[i][j] = -out_activity_prob_b[i].float() * tgt_activity_ids_b[j] - (1 - out_activity_prob_b[i].float()) * (1 - tgt_activity_ids_b[j])  # direction: -> smaller cost  0.
             #         activity_cost[i][j] = F.binary_cross_entropy_with_logits(out_activity_prob_b[i].float(), tgt_activity_ids_b_oh[j].float())
 
-            cost_b = self.cost_group * grouping_cost + self.cost_activity_class * activity_cost + self.cost_size * size_cost
+            # cost_b = self.cost_group * grouping_cost + self.cost_activity_class * activity_cost + self.cost_size * size_cost
+            cost_b = cost_iou
             cost_b = cost_b.cpu().numpy()
             indices_b = linear_sum_assignment(cost_b)
             indices.append(indices_b)  # indices: B, 2 (prediction_id, target_id), num_groups
