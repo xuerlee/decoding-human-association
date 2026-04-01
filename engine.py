@@ -687,177 +687,175 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
                 metric_logger.update(**{k: v})
 
         # for final evaluation
-        if if_confuse:
-            pred_action_logits = outputs['pred_action_logits']
-            action_gts = targets[1].decompose()[0].cpu().numpy()
-            valid_mask = (action_gts != -1)
-            for i, pred_action_logit in enumerate(pred_action_logits):
-                pred_action_logit = pred_action_logits[i][valid_mask[i]]
-                pred_action = pred_action_logit.argmax(dim=-1).cpu().numpy()
-                all_action_preds.extend(pred_action)
-                action_gt = action_gts[i][~(action_gts[i] == -1)]
-                all_action_gts.extend(action_gt)
-
-            if dataset == 'collective':
-                attention_weights = outputs['attention_weights']
-                one_hot_gts = targets[3].decompose()[0]
-                one_hot_masks = ~targets[3].decompose()[1]
-                pred_activity_logits = outputs['pred_activity_logits']
-                activity_gts = targets[2].decompose()[0]
-                correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
-                    grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
-                                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
-                                      all_activity_preds, all_activity_gts)
-
-            if dataset == 'jrdb' or dataset == 'jrdb_group':
-                attention_weights = outputs['attention_weights']
-                one_hot_gts = targets[3].decompose()[0]
-                one_hot_masks = ~targets[3].decompose()[1]
-                pred_activity_logits = outputs['pred_activity_logits']
-                activity_gts = targets[2].decompose()[0]
-                activity_masks = ~targets[2].decompose()[1]
-
-                # for group activity error
-                correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
-                    grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
-                                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
-                                      all_activity_preds, all_activity_gts)
-
-                # for G1 AP, G2 AP, G3 AP, G4 AP, G5+ AP, Overall AP
-                records_b, npos_b = collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_gts,
-                                                                        one_hot_masks)
-                all_records.extend(records_b)
-                npos_bucket.update(npos_b)
-
-                # for p, r, f1
-                (gt_groups_ids_b, gt_groups_activity_b,
-                 pred_groups_ids_b, pred_groups_activity_b, pred_groups_scores_b) = build_groups_dicts_from_tensors(
-                    args, meta, valid_mask,
-                    attention_weights, one_hot_gts, one_hot_masks,
-                    pred_activity_logits, activity_gts, activity_masks
-                )
-                for ck in gt_groups_ids_b.keys():
-                    gt_groups_ids_all[ck] = gt_groups_ids_b[ck]
-                    gt_groups_activity_all[ck] = gt_groups_activity_b[ck]
-
-                for ck in pred_groups_ids_b.keys():
-                    pred_groups_ids_all[ck] = pred_groups_ids_b[ck]
-                    pred_groups_activity_all[ck] = pred_groups_activity_b[ck]
-                    pred_groups_scores_all[ck] = pred_groups_scores_b[ck]
-
-            if dataset == 'cafe':
-                attention_weights = outputs['attention_weights']
-                one_hot_gts = targets[3].decompose()[0]
-                one_hot_masks = ~targets[3].decompose()[1]
-                pred_activity_logits = outputs['pred_activity_logits']
-                activity_gts = targets[2].decompose()[0]
-                activity_masks = ~targets[2].decompose()[1]
-
-                # for group activity error
-                correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
-                    grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
-                                      correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
-                                      all_activity_preds, all_activity_gts)
-
-                # for Group mAP
-                (gt_groups_ids_b, gt_groups_activity_b,
-                 pred_groups_ids_b, pred_groups_activity_b, pred_groups_scores_b) = build_groups_dicts_from_tensors(
-                    args, meta, valid_mask,
-                    attention_weights, one_hot_gts, one_hot_masks,
-                    pred_activity_logits, activity_gts, activity_masks
-                )
-
-                B = attention_weights.shape[0]
-                for i in range(B):
-                    row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
-                    oh = one_hot_gts[i][row_mask]
-                    mask_valid = one_hot_masks[i][row_mask]
-                    oh = oh[:, mask_valid[0]]
-                    aw = attention_weights[i][valid_mask[i]]
-                    all_oh.append(oh.detach().cpu())
-                    all_aw.append(aw.detach().cpu())
-
-                for ck in gt_groups_ids_b.keys():
-                    gt_groups_ids_all[ck] = gt_groups_ids_b[ck]
-                    gt_groups_activity_all[ck] = gt_groups_activity_b[ck]
-
-                for ck in pred_groups_ids_b.keys():
-                    pred_groups_ids_all[ck] = pred_groups_ids_b[ck]
-                    pred_groups_activity_all[ck] = pred_groups_activity_b[ck]
-                    pred_groups_scores_all[ck] = pred_groups_scores_b[ck]
-
-
-    # final evaluation
-    if if_confuse:
-        overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
-        overall_idv_action_error = 100 - overall_idv_action_acc * 100
-        print('overall_idv_action_error: ', overall_idv_action_error)
-
-        overall_grp_activity_acc = (torch.as_tensor(all_activity_preds) == torch.as_tensor(all_activity_gts)).float().mean()
-        overall_grp_activity_error = 100 - overall_grp_activity_acc * 100
-        print('overall_grp_activity_error: ', overall_grp_activity_error)
+        pred_action_logits = outputs['pred_action_logits']
+        action_gts = targets[1].decompose()[0].cpu().numpy()
+        valid_mask = (action_gts != -1)
+        for i, pred_action_logit in enumerate(pred_action_logits):
+            pred_action_logit = pred_action_logits[i][valid_mask[i]]
+            pred_action = pred_action_logit.argmax(dim=-1).cpu().numpy()
+            all_action_preds.extend(pred_action)
+            action_gt = action_gts[i][~(action_gts[i] == -1)]
+            all_action_gts.extend(action_gt)
 
         if dataset == 'collective':
-            membership_acc = 100 * (correct_memberships / overall_persons)
-            social_acc = 100 * (correct_persons / overall_persons)
-            grouping_acc = 100 * (correct_groups / overall_groups)
-            print('CAD membership accuracy: ', membership_acc)
-            print('CAD social accuracy: ', social_acc)
-            print('CAD grouping accuracy: ', grouping_acc)
+            attention_weights = outputs['attention_weights']
+            one_hot_gts = targets[3].decompose()[0]
+            one_hot_masks = ~targets[3].decompose()[1]
+            pred_activity_logits = outputs['pred_activity_logits']
+            activity_gts = targets[2].decompose()[0]
+            correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
+                grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
+                                  correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
+                                  all_activity_preds, all_activity_gts)
 
-        elif dataset == 'jrdb' or dataset == 'jrdb_group':
-            bucket_names = ["G1", "G2", "G3", "G4", "G5+"]
-            ap_list = []
-            for b in bucket_names:
-                recs = [r for r in all_records if r["bucket"] == b]
-                npos = npos_bucket.get(b, 0)
+        if dataset == 'jrdb' or dataset == 'jrdb_group':
+            attention_weights = outputs['attention_weights']
+            one_hot_gts = targets[3].decompose()[0]
+            one_hot_masks = ~targets[3].decompose()[1]
+            pred_activity_logits = outputs['pred_activity_logits']
+            activity_gts = targets[2].decompose()[0]
+            activity_masks = ~targets[2].decompose()[1]
 
-                ap = ap_from_records(recs, npos)
-                print(b, "AP:", ap)
-                if not np.isnan(ap):
-                    ap_list.append(ap)
+            # for group activity error
+            correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
+                grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
+                                  correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
+                                  all_activity_preds, all_activity_gts)
 
-            if len(ap_list) > 0:
-                overall_ap = np.mean(ap_list)
-            else:
-                overall_ap = np.nan
-            print("overall AP:", overall_ap)
+            # for G1 AP, G2 AP, G3 AP, G4 AP, G5+ AP, Overall AP
+            records_b, npos_b = collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_gts,
+                                                                    one_hot_masks)
+            all_records.extend(records_b)
+            npos_bucket.update(npos_b)
 
-            p, r, f1, (TP, FP, FN) = group_prf_eval(
-                gt_groups_ids_all, pred_groups_ids_all,
-                thresh=0.5, min_group_size=2
+            # for p, r, f1
+            (gt_groups_ids_b, gt_groups_activity_b,
+             pred_groups_ids_b, pred_groups_activity_b, pred_groups_scores_b) = build_groups_dicts_from_tensors(
+                args, meta, valid_mask,
+                attention_weights, one_hot_gts, one_hot_masks,
+                pred_activity_logits, activity_gts, activity_masks
             )
-            print("group_P@0.5:", p)
-            print("group_R@0.5:", r)
-            print("group_F1@0.5:", f1)
+            for ck in gt_groups_ids_b.keys():
+                gt_groups_ids_all[ck] = gt_groups_ids_b[ck]
+                gt_groups_activity_all[ck] = gt_groups_activity_b[ck]
 
-        elif dataset == 'cafe':
-            _, activity_names = _names_for_dataset(dataset)
-            categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
-            mAP10, APs10 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
-                                          pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
-                                          categories, thresh=1.0)
-            mAP05, APs05 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
-                                          pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
-                                          categories, thresh=0.5)
-            outlier_from_onehot = outlier_metric_from_onehot(all_oh, all_aw)
-            num_class = len(activity_names)
-            outlier = outlier_metric(gt_groups_ids_all, gt_groups_activity_all, pred_groups_ids_all, pred_groups_activity_all, num_class-1)
-            print("CAFE group_mAP@1.0:", mAP10)
-            print("CAFE group_mAP@0.5:", mAP05)
-            print("CAFE outlier_mIoU:", outlier)
-            print("CAFE outlier_mIoU_from_onehot:", outlier_from_onehot)
+            for ck in pred_groups_ids_b.keys():
+                pred_groups_ids_all[ck] = pred_groups_ids_b[ck]
+                pred_groups_activity_all[ck] = pred_groups_activity_b[ck]
+                pred_groups_scores_all[ck] = pred_groups_scores_b[ck]
 
-            p, r, f1, (TP, FP, FN) = group_prf_eval(
-                gt_groups_ids_all, pred_groups_ids_all,
-                thresh=0.5, min_group_size=2
+        if dataset == 'cafe':
+            attention_weights = outputs['attention_weights']
+            one_hot_gts = targets[3].decompose()[0]
+            one_hot_masks = ~targets[3].decompose()[1]
+            pred_activity_logits = outputs['pred_activity_logits']
+            activity_gts = targets[2].decompose()[0]
+            activity_masks = ~targets[2].decompose()[1]
+
+            # for group activity error
+            correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons, all_activity_preds, all_activity_gts = \
+                grouping_accuracy(valid_mask, attention_weights, one_hot_gts, one_hot_masks, pred_activity_logits, activity_gts,
+                                  correct_groups, overall_groups, correct_persons, correct_memberships, overall_persons,
+                                  all_activity_preds, all_activity_gts)
+
+            # for Group mAP
+            (gt_groups_ids_b, gt_groups_activity_b,
+             pred_groups_ids_b, pred_groups_activity_b, pred_groups_scores_b) = build_groups_dicts_from_tensors(
+                args, meta, valid_mask,
+                attention_weights, one_hot_gts, one_hot_masks,
+                pred_activity_logits, activity_gts, activity_masks
             )
 
-            print("group_P@0.5:", p)
-            print("group_R@0.5:", r)
-            print("group_F1@0.5:", f1)
+            B = attention_weights.shape[0]
+            for i in range(B):
+                row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
+                oh = one_hot_gts[i][row_mask]
+                mask_valid = one_hot_masks[i][row_mask]
+                oh = oh[:, mask_valid[0]]
+                aw = attention_weights[i][valid_mask[i]]
+                all_oh.append(oh.detach().cpu())
+                all_aw.append(aw.detach().cpu())
 
+            for ck in gt_groups_ids_b.keys():
+                gt_groups_ids_all[ck] = gt_groups_ids_b[ck]
+                gt_groups_activity_all[ck] = gt_groups_activity_b[ck]
 
+            for ck in pred_groups_ids_b.keys():
+                pred_groups_ids_all[ck] = pred_groups_ids_b[ck]
+                pred_groups_activity_all[ck] = pred_groups_activity_b[ck]
+                pred_groups_scores_all[ck] = pred_groups_scores_b[ck]
+
+    # final evaluation
+    overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
+    overall_idv_action_error = 100 - overall_idv_action_acc * 100
+    print('overall_idv_action_error: ', overall_idv_action_error)
+
+    overall_grp_activity_acc = (torch.as_tensor(all_activity_preds) == torch.as_tensor(all_activity_gts)).float().mean()
+    overall_grp_activity_error = 100 - overall_grp_activity_acc * 100
+    print('overall_grp_activity_error: ', overall_grp_activity_error)
+
+    if dataset == 'collective':
+        membership_acc = 100 * (correct_memberships / overall_persons)
+        social_acc = 100 * (correct_persons / overall_persons)
+        grouping_acc = 100 * (correct_groups / overall_groups)
+        print('CAD membership accuracy: ', membership_acc)
+        print('CAD social accuracy: ', social_acc)
+        print('CAD grouping accuracy: ', grouping_acc)
+
+    elif dataset == 'jrdb' or dataset == 'jrdb_group':
+        bucket_names = ["G1", "G2", "G3", "G4", "G5+"]
+        ap_list = []
+        for b in bucket_names:
+            recs = [r for r in all_records if r["bucket"] == b]
+            npos = npos_bucket.get(b, 0)
+
+            ap = ap_from_records(recs, npos)
+            print(b, "AP:", ap)
+            if not np.isnan(ap):
+                ap_list.append(ap)
+
+        if len(ap_list) > 0:
+            overall_ap = np.mean(ap_list)
+        else:
+            overall_ap = np.nan
+        print("overall AP:", overall_ap)
+
+        p, r, f1, (TP, FP, FN) = group_prf_eval(
+            gt_groups_ids_all, pred_groups_ids_all,
+            thresh=0.5, min_group_size=2
+        )
+        print("group_P@0.5:", p)
+        print("group_R@0.5:", r)
+        print("group_F1@0.5:", f1)
+        stats = {'overall AP': overall_ap}
+
+    elif dataset == 'cafe':
+        _, activity_names = _names_for_dataset(dataset)
+        categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
+        mAP10, APs10 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
+                                      pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
+                                      categories, thresh=1.0)
+        mAP05, APs05 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
+                                      pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
+                                      categories, thresh=0.5)
+        outlier_from_onehot = outlier_metric_from_onehot(all_oh, all_aw)
+        num_class = len(activity_names)
+        outlier = outlier_metric(gt_groups_ids_all, gt_groups_activity_all, pred_groups_ids_all, pred_groups_activity_all, num_class-1)
+        print("CAFE group_mAP@1.0:", mAP10)
+        print("CAFE group_mAP@0.5:", mAP05)
+        print("CAFE outlier_mIoU:", outlier)
+        print("CAFE outlier_mIoU_from_onehot:", outlier_from_onehot)
+
+        p, r, f1, (TP, FP, FN) = group_prf_eval(
+            gt_groups_ids_all, pred_groups_ids_all,
+            thresh=0.5, min_group_size=2
+        )
+
+        print("group_P@0.5:", p)
+        print("group_R@0.5:", r)
+        print("group_F1@0.5:", f1)
+
+    if if_confuse:
         # confusion matrix (labels depend on dataset)
         ds_action_names, _ = _names_for_dataset(dataset)
         utils.plot_confusion_matrix(
