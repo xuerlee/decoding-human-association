@@ -82,8 +82,8 @@ def get_args_parser():
                         # default='collective',
                         # default='volleyball',
                         # default='jrdb',
-                        # default='jrdb_group',
-                        default='cafe',
+                        default='jrdb_group',
+                        # default='cafe',
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--cafe_split',
                         default='place',
@@ -96,15 +96,15 @@ def get_args_parser():
                         # default='/home/jiqqi/data/new-new-collective/ActivityDataset',
                         # default='/media/jiqqi/新加卷/dataset/volleyball_/videos',
                         # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/images',
-                        # default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/images',
-                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
+                        default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/images',
+                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/Dataset/cafe',
                         type=str)
     parser.add_argument('--ann_path',
                         # default='/home/jiqqi/data/social_CAD/anns',
                         # default='/home/jiqqi/data/Volleyball/volleyball_tracking_annotation',
                         # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/labels/labels_2d',
-                        # default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/labels/labels_2d',
-                        default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
+                        default='/media/jiqqi/新加卷/dataset/JRDB_group/train_images/labels/labels_2d',
+                        # default='/media/jiqqi/OS/dataset/Cafe_Dataset/evaluation/gt_tracks.txt',
                         type=str)
     parser.add_argument('--jrdb_detection_path',
                         # default='/media/jiqqi/新加卷/dataset/JRDB/train_images/detections_2d')
@@ -133,7 +133,7 @@ def get_args_parser():
                         default='',
                         # default='output_dir/restartall_hidden256_enc2dec2_lossratio223_1frame_kinetic400/checkpoint0250.pth',
                         # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_cafe_fullonehot_kinetics_sampleequal_CyclicLR_place/checkpoint0010.pth',
-                        # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdb_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR/checkpoint0029.pth',
+                        # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdbgroup_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR_TransQ_noscalenorm_001entropy_grpbcesizecost_bcesizeloss_rmvNaN_optgroupingonly_lr1e-4_sizelossratio5/checkpoint0015.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -289,8 +289,8 @@ def main(args):
                 if isinstance(v, (int, float)):
                     writer.add_scalar(f"Test/{k}", v, epoch)
 
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                     **{f'test_{k}': v for k, v in test_stats.items()},
+        log_stats = {**{f'train_{k}': v.item() for k, v in train_stats.items()},
+                     **{f'test_{k}': v.item() for k, v in test_stats.items()},
                      'epoch': epoch,
                      'n_parameters': n_parameters}
         if args.output_dir and utils.is_main_process():
