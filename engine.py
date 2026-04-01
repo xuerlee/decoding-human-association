@@ -627,6 +627,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     model.eval()
     criterion.eval()
 
+    stats = {}
     all_action_preds = []
     all_action_gts = []
 
@@ -827,7 +828,7 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         print("group_P@0.5:", p)
         print("group_R@0.5:", r)
         print("group_F1@0.5:", f1)
-        stats = {'overall AP': overall_ap}
+        stats.update({'overall AP': overall_ap})
 
     elif dataset == 'cafe':
         _, activity_names = _names_for_dataset(dataset)
@@ -869,5 +870,5 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     metric_logger.synchronize_between_processes()
     # print("Averaged stats:", metric_logger)
 
-    stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    stats.update({k: meter.global_avg for k, meter in metric_logger.meters.items()})
     return stats
