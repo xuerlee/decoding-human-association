@@ -286,7 +286,6 @@ def main(args):
 
         if writer is not None:
             for k, v in test_stats.items():
-                print(k,v)
                 if isinstance(v, (int, float)):
                     writer.add_scalar(f"Test/{k}", v, epoch)
 

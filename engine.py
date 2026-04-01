@@ -789,13 +789,13 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     # final evaluation
     overall_idv_action_acc = (torch.as_tensor(all_action_preds) == torch.as_tensor(all_action_gts)).float().mean()
     overall_idv_action_error = 100 - overall_idv_action_acc * 100
-    print('overall_idv_action_error: ', overall_idv_action_error)
-    stats.update({'overall_idv_action_error': overall_idv_action_error})
+    print('overall_idv_action_error: ', overall_idv_action_error.item())
+    stats.update({'overall_idv_action_error': overall_idv_action_error.item()})
 
     overall_grp_activity_acc = (torch.as_tensor(all_activity_preds) == torch.as_tensor(all_activity_gts)).float().mean()
     overall_grp_activity_error = 100 - overall_grp_activity_acc * 100
-    print('overall_grp_activity_error: ', overall_grp_activity_error)
-    stats.update({'overall_grp_activity_error': overall_grp_activity_error})
+    print('overall_grp_activity_error: ', overall_grp_activity_error.item())
+    stats.update({'overall_grp_activity_error': overall_grp_activity_error.item()})
 
     if dataset == 'collective':
         membership_acc = 100 * (correct_memberships / overall_persons)
