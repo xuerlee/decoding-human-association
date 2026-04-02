@@ -830,7 +830,8 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         print("group_P@0.5:", p)
         print("group_R@0.5:", r)
         print("group_F1@0.5:", f1)
-        stats.update({'overall AP': overall_ap})
+        stats.update({'overall AP': overall_ap, 'group_P@0.5': p,
+                      'group_R@0.5': r, 'group_F1@0.5': f1})
 
     elif dataset == 'cafe':
         _, activity_names = _names_for_dataset(dataset)
