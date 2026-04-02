@@ -117,12 +117,12 @@ class HungarianMatcher(nn.Module):
                     reduction="none"
                 )
 
-            pred_gid = out_attw_b_ini.argmax(dim=-1)
-            pred_group = torch.zeros_like(out_attw_b_ini)
+            pred_gid = out_attw_b_ini.argmax(dim=-1)  # [num_persons]
+            pred_group = torch.zeros_like(out_attw_b_ini)  # [num_persons, num_queries]
             pred_group[torch.arange(n_person, device=out_attw_b_ini.device), pred_gid] = 1
 
-            pred_group_t = pred_group.T  # [num_queries, n_person]
-            tgt_group_t = tgt_one_hot_b_ini.T  # [n_group, n_person]
+            pred_group_t = pred_group.T  # [num_queries, num_persons]
+            tgt_group_t = tgt_one_hot_b_ini.T  # [num_groups, num_persons]
 
             cost_iou = torch.zeros(num_queries, n_group, device=out_attw.device)
             for i, pred_q in enumerate(pred_group_t):
