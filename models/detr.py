@@ -73,7 +73,7 @@ class DETR(nn.Module):
         boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
         hs, memory, attention_weights, attention_logits = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
 
-        # individual action classfication
+        # individual action classification
         B = src_f.shape[0]
         n_max = src_b.shape[1]
         memory = memory.view(B, n_max, self.hidden_dim)
@@ -167,7 +167,6 @@ class SetCriterion(nn.Module):
         matched_logits = out_activity_logits[idx]  # [N_matched, num_activity_classes]
         tgt_activity_multi = torch.zeros_like(matched_logits)
         tgt_activity_multi.scatter_(1, target_classes_o.unsqueeze(1), 1.0)  # empty groups are not included
-
         losses = {'grp_loss_activity': loss_ce}
 
         if log:
@@ -180,7 +179,7 @@ class SetCriterion(nn.Module):
         return losses
 
     def loss_action_labels(self, outputs, targets, indices, num_groups, log=True):
-        """individual action lassification loss (NLL)
+        """individual action classification loss (NLL)
         targets dicts must contain the key "pred_action_logits" containing a tensor of dim [nb_target_boxes]
         """
         assert 'pred_action_logits' in outputs
@@ -377,7 +376,6 @@ class SetCriterion(nn.Module):
         G2I_mask = self._build_G2I_mask(self.num_activity_classes, self.num_action_classes).to(src_aw.device)  # num_group_classes, num_action_classes
         # G2I_mask = F.softmax(G2I_mask.float(), dim=1)  # one-hot matrix, transfer group labels to related action labels
         G2I_mask = binary_label_smoothing(G2I_mask.float(), 0.1, False)  # one-hot matrix, transfer group labels to related action labels
-
         out_action_probs = F.softmax(out_action_logits, dim=-1)  # B, n_max, num_action_classes
         out_group_labels = out_activity_logits.argmax(dim=-1)  # B, num_queries
         group_expected_actions = G2I_mask[out_group_labels]  # B, num_queries, num_action_classes (one-hot)  select the correspoding rows in g2i mask to get the corresponding expected action distribution

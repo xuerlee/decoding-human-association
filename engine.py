@@ -144,7 +144,8 @@ def bucket_from_size(sz):
 def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_gts, one_hot_masks):
     """
     Return:
-      records: list of dict(score, tp, bucket)
+      records: list of dict(score, tp, bucket), where bucket is the predicted
+        task_3 class name. Invalid class-6 predictions have bucket=None.
       npos_bucket: Counter with GT positives per bucket
     """
     records = []
@@ -153,70 +154,74 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
     for i, oh in enumerate(one_hot_gts):
         row_mask = one_hot_masks[i].any(dim=1)  # valid raws, bool tensor
         oh = oh[row_mask]
+        if oh.numel() == 0:
+            continue
+
         mask_valid = one_hot_masks[i][row_mask]
         oh = oh[:, mask_valid[0]]
         aw = attention_weights[i][valid_mask[i]]
+        if oh.shape[0] == 0 or oh.shape[1] == 0 or aw.shape[0] == 0:
+            continue
 
-        # pred group per person + its confidence
+        # Predicted group id per person; query ids are arbitrary group labels.
         pred_gid = aw.argmax(dim=-1)
-        # score = aw.max(dim=-1).values
+        pred_score = aw.max(dim=-1).values
 
-
-        # build pred_group one-hot for matcher_eval
+        # Build one-hot membership matrix for Hungarian alignment.
         pred_group = torch.zeros_like(aw)
         pred_group[torch.arange(aw.size(0), device=aw.device), pred_gid] = 1
 
-        # -------- Hungarian assignment between pred queries and GT groups --------
         out_ids, tgt_ids = matcher_eval(pred_group, oh)
-        # mapping: pred_query -> gt_group
         map_pred2gt = {int(o): int(t) for o, t in zip(out_ids, tgt_ids)}
-        # map_gt2pred = {int(t): int(o) for o, t in zip(out_ids, tgt_ids)}
 
-        # -------- GT group sizes for bucketing (by GT groups) --------
-        # gt group id per person = argmax over columns (because one-hot membership)
+        # GT task_3 class per person: size of that person's GT group.
         gt_gid = oh.argmax(dim=1).cpu().tolist()
-        gt_cnt = Counter(gt_gid)
+        gt_group_sizes = Counter(gt_gid)
 
-        # count positives per bucket (GT persons)
         for g in gt_gid:
-            npos_bucket[bucket_from_size(gt_cnt[g])] += 1
+            npos_bucket[bucket_from_size(gt_group_sizes[g])] += 1
         npos_bucket["overall"] += len(gt_gid)
 
-        # -------- final TP/FP per person --------
-        # person p is TP if mapped(pred_gid[p]) == gt_gid[p]
         for p in range(len(gt_gid)):
-            g = gt_gid[p]
-            pg = int(pred_gid[p].item())
-            mapped = map_pred2gt.get(pg, None)
-            tp = 1 if (mapped is not None and mapped == gt_gid[p]) else 0
+            true_gid = gt_gid[p]
+            query_id = int(pred_gid[p].item())
+            mapped_gid = map_pred2gt.get(query_id)
+            score = float(pred_score[p].item())
 
-            # matched_query = map_gt2pred.get(g, None)
-
-            # if matched_query is None:
-            #     # no predicted query matched to this GT group -> confidence should be 0
-            #     score = 0.0
-            # else:
-            #     score = float(aw[p, matched_query].item())
-
-            score = 1.0
-
-            # bucket = bucket_from_size(gt_cnt[gt_gid[p]])
-            bucket = bucket_from_size(gt_cnt[g])
-            records.append({"score": score, "tp": tp, "bucket": bucket})
-            # records.append({"score": float(score[p].item()), "tp": tp, "bucket": "overall"})
+            if mapped_gid == true_gid:
+                # Same as toolkit: correct membership becomes its GT size class.
+                records.append({
+                    "score": score,
+                    "tp": 1,
+                    "bucket": bucket_from_size(gt_group_sizes[true_gid]),
+                })
+            else:
+                # Same as toolkit's class 6 for task_3: not in label_map 1..5.
+                records.append({"score": score, "tp": 0, "bucket": None})
 
     return records, npos_bucket
 
 
 def ap_from_records(records, npos):
-    if len(records) == 0:
+    if npos == 0:
         return np.nan
+    if len(records) == 0:
+        return 0.0
 
-    tp = sum(r["tp"] for r in records)
-    total = len(records)
+    records = sorted(records, key=lambda r: r["score"], reverse=True)
+    labels = np.array([r["tp"] for r in records], dtype=bool)
+    scores = np.array([r["score"] for r in records], dtype=float)
 
-    ap = tp / (total + 1e-8)
-    return ap * 100.0
+    sorted_indices = np.argsort(scores)[::-1]
+    true_positive_labels = labels[sorted_indices].astype(int)
+    false_positive_labels = 1 - true_positive_labels
+    cum_true_positives = np.cumsum(true_positive_labels)
+    cum_false_positives = np.cumsum(false_positive_labels)
+    precision = cum_true_positives.astype(float) / (
+        cum_true_positives + cum_false_positives)
+    recall = cum_true_positives.astype(float) / npos
+
+    return utils.compute_average_precision(precision, recall) * 100.0
 
 
 # -------------- cafe -----------------
