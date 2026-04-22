@@ -144,8 +144,8 @@ def bucket_from_size(sz):
 def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_gts, one_hot_masks):
     """
     Return:
-      records: list of dict(score, tp, bucket), where bucket is the predicted
-        task_3 class name. Invalid class-6 predictions have bucket=None.
+      records: list of dict(score, tp, bucket), where bucket is the predicted.
+               Invalid class-6 predictions have bucket=None.
       npos_bucket: Counter with GT positives per bucket
     """
     records = []
@@ -174,7 +174,7 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
         out_ids, tgt_ids = matcher_eval(pred_group, oh)
         map_pred2gt = {int(o): int(t) for o, t in zip(out_ids, tgt_ids)}
 
-        # GT task_3 class per person: size of that person's GT group.
+        # size of that person's GT group.
         gt_gid = oh.argmax(dim=1).cpu().tolist()
         gt_group_sizes = Counter(gt_gid)
 
@@ -189,14 +189,14 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
             score = float(pred_score[p].item())
 
             if mapped_gid == true_gid:
-                # Same as toolkit: correct membership becomes its GT size class.
+                # correct membership becomes its GT size class.
                 records.append({
                     "score": score,
                     "tp": 1,
                     "bucket": bucket_from_size(gt_group_sizes[true_gid]),
                 })
             else:
-                # Same as toolkit's class 6 for task_3: not in label_map 1..5.
+                # not in label_map 1..5.
                 records.append({"score": score, "tp": 0, "bucket": None})
 
     return records, npos_bucket
