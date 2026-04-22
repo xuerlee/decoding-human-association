@@ -606,7 +606,8 @@ def compute_average_precision(precision, recall):
   if not isinstance(precision, np.ndarray) or not isinstance(recall,
                                                              np.ndarray):
     raise ValueError("precision and recall must be numpy array")
-  if precision.dtype != np.float or recall.dtype != np.float:
+  if (not np.issubdtype(precision.dtype, np.floating) or
+      not np.issubdtype(recall.dtype, np.floating)):
     raise ValueError("input must be float numpy array.")
   if len(precision) != len(recall):
     raise ValueError("precision and recall must be of the same size.")
