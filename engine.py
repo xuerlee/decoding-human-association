@@ -376,7 +376,7 @@ def group_prf_eval(
     min_group_size=2,
     ignore_pred_gid_minus1=True,
     crit="half",
-    count_singletons=True,
+    count_singletons=False,
 ):
     """
     Evaluate group detection P/R/F1:
