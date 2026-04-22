@@ -376,9 +376,10 @@ def group_prf_eval(
     min_group_size=2,
     ignore_pred_gid_minus1=True,
     crit="half",
+    count_singletons=True,
 ):
     """
-    Evaluate group detection P/R/F1 using the SAME LOGIC as the old Evaluation.group_eval:
+    Evaluate group detection P/R/F1:
       - no 1-to-1 matching
       - for every GT group and every predicted group, if overlap > threshold, TP += 1
       - FP = num_pred_groups - TP
@@ -387,17 +388,19 @@ def group_prf_eval(
     Args:
         gt_groups_ids:   dict clip_key -> [ {gt_gid: [person_ids]} ]
         pred_groups_ids: dict clip_key -> [ {pred_gid: [person_ids]} ]
-        thresh: only used if crit is None; otherwise crit controls threshold
+        thresh: only used when crit does not match a known baseline criterion
         min_group_size: only evaluate groups with size >= min_group_size
         ignore_pred_gid_minus1: whether to ignore gid == -1 in predictions
         crit: "half", "card", "dpmm", "all"
+        count_singletons: whether to count one-person groups during evaluation
 
     Returns:
-        precision*100, recall*100, f1*100, (TP, FP, FN)
+        precision, recall, f1, (TP, FP, FN), where precision/recall/f1 are in [0, 1]
     """
     TP = 0
     FP = 0
     FN = 0
+    eval_min_group_size = 1 if count_singletons else min_group_size
 
     for clip_key in pred_groups_ids.keys():
         if clip_key not in gt_groups_ids:
@@ -409,7 +412,7 @@ def group_prf_eval(
         # filter GT groups
         gt_groups = []
         for gid, members in gt_dict.items():
-            if len(members) >= min_group_size:
+            if len(members) >= eval_min_group_size:
                 gt_groups.append((gid, members))
 
         # filter predicted groups
@@ -417,14 +420,12 @@ def group_prf_eval(
         for gid, members in pred_dict.items():
             if ignore_pred_gid_minus1 and gid == -1:
                 continue
-            if len(members) >= min_group_size:
+            if len(members) >= eval_min_group_size:
                 pred_groups.append((gid, members))
 
         num_GT = len(gt_groups)
         num_GROUP = len(pred_groups)
 
-        # same logic as old Evaluation.group_eval:
-        # double loop over GT and pred, no one-to-one matching
         TP_clip = 0
         for ggid, gmembers in gt_groups:
             gt_set = set(gmembers)
@@ -438,31 +439,30 @@ def group_prf_eval(
 
                 if crit == "half":
                     if pred_card == 2 and gt_card == 2:
-                        if len(gt_set - pred_set) == 0:
+                        if not len(gt_set - pred_set):
                             TP_clip += 1
                     elif inters_card / max(gt_card, pred_card) > 1 / 2:
                         TP_clip += 1
 
                 elif crit == "card":
                     if pred_card == 2 and gt_card == 2:
-                        if len(gt_set - pred_set) == 0:
+                        if not len(gt_set - pred_set):
                             TP_clip += 1
                     elif inters_card / max(gt_card, pred_card) > 2 / 3:
                         TP_clip += 1
 
                 elif crit == "dpmm":
                     if pred_card == 2 and gt_card == 2:
-                        if len(gt_set - pred_set) == 0:
+                        if not len(gt_set - pred_set):
                             TP_clip += 1
                     elif inters_card / max(gt_card, pred_card) > 0.6:
                         TP_clip += 1
 
                 elif crit == "all":
-                    if len(gt_set - pred_set) == 0:
+                    if not len(gt_set - pred_set):
                         TP_clip += 1
 
                 else:
-                    # fallback: use thresh directly
                     if group_overlap_maxnorm(pmembers, gmembers) > thresh:
                         TP_clip += 1
 
@@ -473,11 +473,19 @@ def group_prf_eval(
         FP += FP_clip
         FN += FN_clip
 
-    precision = TP / (TP + FP + 1e-8)
-    recall = TP / (TP + FN + 1e-8)
-    f1 = 0.0 if (precision + recall) == 0 else (2 * precision * recall / (precision + recall))
+    if TP + FP == 0:
+        precision = 0
+    else:
+        precision = TP / (TP + FP)
 
-    return precision * 100.0, recall * 100.0, f1 * 100.0, (TP, FP, FN)
+    if TP + FN == 0:
+        recall = 0
+    else:
+        recall = TP / (TP + FN)
+
+    f1 = (2 * precision * recall) / (precision + recall + 1e-8)
+
+    return precision, recall, f1, (TP, FP, FN)
 
 
 def train_one_epoch_accum_steps(model: torch.nn.Module, criterion: torch.nn.Module,
