@@ -299,23 +299,26 @@ def main(args):
         else:
             raise ValueError('evalallepochs.py currently expects dataset to be jrdb, jrdb_group, or cafe')
 
-        if 'social_acc' not in test_stats:
-            raise KeyError(f'{checkpoint_path} evaluation did not return social_acc. test_stats keys: {list(test_stats.keys())}')
+        if 'social_acc' not in test_stats or 'membership_acc' not in test_stats:
+            raise KeyError(f'{checkpoint_path} evaluation did not return social_acc or membership_acc. test_stats keys: {list(test_stats.keys())}')
 
         social_acc = scalar(test_stats['social_acc'])
+        membership_acc = scalar(test_stats['membership_acc'])
         rows.append({
             'epoch': int(epoch),
             'checkpoint': checkpoint_path.name,
             'social_acc': social_acc,
+            'membership_acc': membership_acc,
         })
-        print(f'epoch {epoch}: social_acc={social_acc:.4f} ({checkpoint_path.name})')
+        print(f'epoch {epoch}: social_acc={social_acc:.4f}, membership_acc={membership_acc:.4f} ({checkpoint_path.name})')
 
     csv_path = output_dir / 'epoch_social_acc.csv'
     json_path = output_dir / 'epoch_social_acc.json'
-    plot_path = output_dir / 'epoch_social_acc.png'
+    social_plot_path = output_dir / 'epoch_social_acc.png'
+    membership_plot_path = output_dir / 'epoch_membership_acc.png'
 
     with csv_path.open('w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['epoch', 'checkpoint', 'social_acc'])
+        writer = csv.DictWriter(f, fieldnames=['epoch', 'checkpoint', 'social_acc', 'membership_acc'])
         writer.writeheader()
         writer.writerows(rows)
 
@@ -333,6 +336,8 @@ def main(args):
 
     epochs = [row['epoch'] for row in rows]
     social_accs = [row['social_acc'] for row in rows]
+    membership_accs = [row['membership_acc'] for row in rows]
+
     plt.figure(figsize=(8, 5))
     plt.plot(epochs, social_accs, marker='o')
     plt.xlabel('Epoch')
@@ -340,10 +345,20 @@ def main(args):
     plt.title('Epoch vs Social Acc')
     plt.grid(True, linestyle='--', alpha=0.4)
     plt.tight_layout()
-    plt.savefig(plot_path, dpi=200)
+    plt.savefig(social_plot_path, dpi=200)
     plt.close()
 
-    print(f'Saved results to {csv_path}, {json_path}, and {plot_path}')
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, membership_accs, marker='o')
+    plt.xlabel('Epoch')
+    plt.ylabel('Membership Acc')
+    plt.title('Epoch vs Membership Acc')
+    plt.grid(True, linestyle='--', alpha=0.4)
+    plt.tight_layout()
+    plt.savefig(membership_plot_path, dpi=200)
+    plt.close()
+
+    print(f'Saved results to {csv_path}, {json_path}, {social_plot_path}, and {membership_plot_path}')
 
 
 
