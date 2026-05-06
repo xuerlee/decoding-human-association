@@ -271,10 +271,21 @@ def main(args):
 
     save_path = str(Path(args.resume) if Path(args.resume).is_dir() else Path(args.resume).parent)
     rows = []
+    bad_checkpoints = []
     print(f'Found {len(checkpoints)} checkpoints.')
 
     for checkpoint_path in checkpoints:
-        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        except (RuntimeError, EOFError, OSError) as exc:
+            print(f'Skip broken checkpoint: {checkpoint_path} ({exc})')
+            bad_checkpoints.append({
+                'checkpoint': checkpoint_path.name,
+                'path': str(checkpoint_path),
+                'error': str(exc),
+            })
+            continue
+
         model_without_ddp.load_state_dict(checkpoint['model'])
 
         epoch = checkpoint.get('epoch', checkpoint_epoch(checkpoint_path))
@@ -310,6 +321,15 @@ def main(args):
 
     with json_path.open('w') as f:
         json.dump(rows, f, indent=2)
+
+    if bad_checkpoints:
+        bad_path = output_dir / 'bad_checkpoints.json'
+        with bad_path.open('w') as f:
+            json.dump(bad_checkpoints, f, indent=2)
+        print(f'Skipped {len(bad_checkpoints)} broken checkpoints. See {bad_path}')
+
+    if len(rows) == 0:
+        raise RuntimeError('No valid checkpoints were evaluated.')
 
     epochs = [row['epoch'] for row in rows]
     social_accs = [row['social_acc'] for row in rows]
