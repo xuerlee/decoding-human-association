@@ -164,12 +164,11 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
             continue
 
         # Predicted group id per person; query ids are arbitrary group labels.
-        pred_gid = aw.argmax(dim=-1)
+        pred_group_ids = aw.argmax(dim=-1)
         pred_score = aw.max(dim=-1).values
-
-        # Build one-hot membership matrix for Hungarian alignment.
         pred_group = torch.zeros_like(aw)
-        pred_group[torch.arange(aw.size(0), device=aw.device), pred_gid] = 1
+        for a, b in enumerate(pred_group_ids):
+            pred_group[a, b] = 1
 
         out_ids, tgt_ids = matcher_eval(pred_group, oh)
         map_pred2gt = {int(o): int(t) for o, t in zip(out_ids, tgt_ids)}
@@ -179,19 +178,19 @@ def collect_grouping_ap_records_gtboxes(valid_mask, attention_weights, one_hot_g
         gt_group_sizes = Counter(gt_gid)
 
         for g in gt_gid:
-            npos_bucket[bucket_from_size(gt_group_sizes[g])] += 1
+            npos_bucket[bucket_from_size(gt_group_sizes[g])] += 1  # here should be the number of persons instead of the number of groups
         npos_bucket["overall"] += len(gt_gid)
 
         for p in range(len(gt_gid)):
             true_gid = gt_gid[p]
-            query_id = int(pred_gid[p].item())
+            query_id = int(pred_group_ids[p].item())
             mapped_gid = map_pred2gt.get(query_id)
             score = float(pred_score[p].item())
 
             if mapped_gid == true_gid:
                 # correct membership becomes its GT size class.
                 records.append({
-                    "score": score,
+                    "score": score,  # the score should not be the aw value
                     "tp": 1,
                     "bucket": bucket_from_size(gt_group_sizes[true_gid]),
                 })
@@ -814,11 +813,18 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         membership_acc = 100 * (correct_memberships / overall_persons)
         social_acc = 100 * (correct_persons / overall_persons)
         grouping_acc = 100 * (correct_groups / overall_groups)
-        print('CAD membership accuracy: ', membership_acc)
-        print('CAD social accuracy: ', social_acc)
-        print('CAD grouping accuracy: ', grouping_acc)
+        print('membership accuracy: ', membership_acc)
+        print('social accuracy: ', social_acc)
+        print('grouping accuracy: ', grouping_acc)
 
     elif dataset == 'jrdb' or dataset == 'jrdb_group':
+        membership_acc = 100 * (correct_memberships / overall_persons)
+        social_acc = 100 * (correct_persons / overall_persons)
+        grouping_acc = 100 * (correct_groups / overall_groups)
+        print('membership accuracy: ', membership_acc)
+        print('social accuracy: ', social_acc)
+        print('grouping accuracy: ', grouping_acc)
+
         bucket_names = ["G1", "G2", "G3", "G4", "G5+"]
         ap_list = []
         for b in bucket_names:
@@ -843,8 +849,9 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         print("group_P@0.5:", p)
         print("group_R@0.5:", r)
         print("group_F1@0.5:", f1)
-        stats.update({'overall AP': overall_ap, 'group_P@0.5': p,
-                      'group_R@0.5': r, 'group_F1@0.5': f1})
+        # stats.update({'overall AP': overall_ap, 'group_P@0.5': p,
+        #               'group_R@0.5': r, 'group_F1@0.5': f1})
+        stats.update({'social_acc': social_acc.item()})
 
     elif dataset == 'cafe':
         _, activity_names = _names_for_dataset(dataset)

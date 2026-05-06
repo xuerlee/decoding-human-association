@@ -1,7 +1,9 @@
 import argparse
+import csv
 import datetime
 import json
 import random
+import re
 import time
 from pathlib import Path
 
@@ -11,7 +13,10 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
 import os
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 # os.environ['PYTHONMALLOC'] = 'debug'
 # os.environ['MALLOC_CHECK_'] = '3'
@@ -24,6 +29,37 @@ import util.misc as utils
 from engine import evaluate, train_one_epoch, train_one_epoch_accum_steps
 from models import build_model
 
+
+def checkpoint_epoch(path):
+    match = re.search(r'checkpoint(\d+)\.pth$', path.name)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def find_checkpoints(resume):
+    resume_path = Path(resume)
+    if resume_path.is_file():
+        return [resume_path]
+
+    numbered = [
+        path for path in resume_path.glob('checkpoint*.pth')
+        if checkpoint_epoch(path) is not None
+    ]
+    checkpoints = numbered if numbered else list(resume_path.glob('*.pth'))
+    checkpoints.sort(key=lambda path: (
+        checkpoint_epoch(path) if checkpoint_epoch(path) is not None else float('inf'),
+        path.name,
+    ))
+    return checkpoints
+
+
+def scalar(value):
+    if torch.is_tensor(value):
+        return value.item()
+    if isinstance(value, np.generic):
+        return value.item()
+    return float(value)
 
 
 def get_args_parser():
@@ -227,23 +263,67 @@ def main(args):
                                      drop_last=False, num_workers=args.num_workers)
 
     output_dir = Path(args.output_dir)
-    save_path = args.resume
-    overall_aps = []
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    checkpoints = os.listdir(args.resume)
-    for checkpoint in checkpoints:
-        check_path = args.resume + '/' + checkpoint
-        checkpoint = torch.load(check_path, map_location='cpu')
+    checkpoints = find_checkpoints(args.resume)
+    if len(checkpoints) == 0:
+        raise FileNotFoundError(f'No checkpoint files found in {args.resume}')
+
+    save_path = str(Path(args.resume) if Path(args.resume).is_dir() else Path(args.resume).parent)
+    rows = []
+    print(f'Found {len(checkpoints)} checkpoints.')
+
+    for checkpoint_path in checkpoints:
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
         model_without_ddp.load_state_dict(checkpoint['model'])
 
+        epoch = checkpoint.get('epoch', checkpoint_epoch(checkpoint_path))
+        if epoch is None:
+            epoch = len(rows)
+
         if args.dataset == 'cafe':
-            test_stats = evaluate(args, args.dataset, model, criterion, data_loader_test, device, save_path, if_confuse=True)
-            return
+            test_stats = evaluate(args, args.dataset, model, criterion, data_loader_test, device, save_path, if_confuse=False)
         elif args.dataset == 'jrdb' or args.dataset == 'jrdb_group':
-            test_stats = evaluate(args, args.dataset, model, criterion, data_loader_val, device, save_path, if_confuse=True)
-            overall_ap = test_stats['overall AP']
-            overall_aps.append(overall_ap)
-            return
+            test_stats = evaluate(args, args.dataset, model, criterion, data_loader_val, device, save_path, if_confuse=False)
+        else:
+            raise ValueError('evalallepochs.py currently expects dataset to be jrdb, jrdb_group, or cafe')
+
+        if 'social_acc' not in test_stats:
+            raise KeyError(f'{checkpoint_path} evaluation did not return social_acc. test_stats keys: {list(test_stats.keys())}')
+
+        social_acc = scalar(test_stats['social_acc'])
+        rows.append({
+            'epoch': int(epoch),
+            'checkpoint': checkpoint_path.name,
+            'social_acc': social_acc,
+        })
+        print(f'epoch {epoch}: social_acc={social_acc:.4f} ({checkpoint_path.name})')
+
+    csv_path = output_dir / 'epoch_social_acc.csv'
+    json_path = output_dir / 'epoch_social_acc.json'
+    plot_path = output_dir / 'epoch_social_acc.png'
+
+    with csv_path.open('w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['epoch', 'checkpoint', 'social_acc'])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    with json_path.open('w') as f:
+        json.dump(rows, f, indent=2)
+
+    epochs = [row['epoch'] for row in rows]
+    social_accs = [row['social_acc'] for row in rows]
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, social_accs, marker='o')
+    plt.xlabel('Epoch')
+    plt.ylabel('Social Acc')
+    plt.title('Epoch vs Social Acc')
+    plt.grid(True, linestyle='--', alpha=0.4)
+    plt.tight_layout()
+    plt.savefig(plot_path, dpi=200)
+    plt.close()
+
+    print(f'Saved results to {csv_path}, {json_path}, and {plot_path}')
 
 
 
