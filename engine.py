@@ -47,6 +47,16 @@ _ACTION_ACTIVITY_NAMES = {
 
 def _names_for_dataset(dataset: str):
     return _ACTION_ACTIVITY_NAMES.get(dataset, (None, None))
+
+
+def _to_python_float(value):
+    if torch.is_tensor(value):
+        return value.item()
+    if isinstance(value, np.generic):
+        return value.item()
+    return float(value)
+
+
 # jrdb:
 # action_names = ['standing', 'walking', 'sitting', 'holding sth', 'listening to someone',
 #                 'talking to someone', 'looking at robot', 'looking into sth', 'cycling',
@@ -851,8 +861,8 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         print("group_F1@0.5:", f1)
         # stats.update({'overall AP': overall_ap, 'group_P@0.5': p,
         #               'group_R@0.5': r, 'group_F1@0.5': f1})
-        stats.update({'membership_acc': membership_acc.item(), 
-                      'social_acc': social_acc.item()})
+        stats.update({'membership_acc': _to_python_float(membership_acc),
+                      'social_acc': _to_python_float(social_acc)})
 
     elif dataset == 'cafe':
         _, activity_names = _names_for_dataset(dataset)
