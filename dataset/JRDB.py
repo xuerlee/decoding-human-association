@@ -234,20 +234,20 @@ def jrdb_read_annotations(ann_file, seq_detections):
             noeval = attr["no_eval"]
 
             # filter fully occluded bboxes and bboex that can not be detected
-            # if occ != "Fully_occluded" and noeval == False:
-            #     box = obj.get("box", [0, 0, 0, 0])
-            #     x1, y1, x2, y2 = map(float, box)
-            #     if x1 < 0: x1 = 0.0
-            #     if y1 < 0: y1 = 0.0
-            #     bbox = [x1, y1, x1 + x2, y1 + y2]
+            if occ != "Fully_occluded" and noeval == False:
+                box = obj.get("box", [0, 0, 0, 0])
+                x1, y1, x2, y2 = map(float, box)
+                if x1 < 0: x1 = 0.0
+                if y1 < 0: y1 = 0.0
+                bbox = [x1, y1, x1 + x2, y1 + y2]
             
-            #     ious = []
-            #     for bbox_dec in detections:
-            #         iou = box_iou_xyxy(bbox, bbox_dec)
-            #         ious.append(iou)
-            #     iou_max = max(ious)
-            #     if iou_max < 0.5:
-            #         continue
+                ious = []
+                for bbox_dec in detections:
+                    iou = box_iou_xyxy(bbox, bbox_dec)
+                    ious.append(iou)
+                iou_max = max(ious)
+                if iou_max < 0.5:
+                    continue
 
             if  noeval == False:
                 box = obj.get("box", [0, 0, 0, 0])
