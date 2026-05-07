@@ -851,10 +851,8 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         print("group_F1@0.5:", f1)
         # stats.update({'overall AP': overall_ap, 'group_P@0.5': p,
         #               'group_R@0.5': r, 'group_F1@0.5': f1})
-        stats.update({
-            'social_acc': social_acc.item(),
-            'membership_acc': membership_acc.item(),
-        })
+        stats.update({'membership_acc': membership_acc.item(), 
+                      'social_acc': social_acc.item()})
 
     elif dataset == 'cafe':
         _, activity_names = _names_for_dataset(dataset)
