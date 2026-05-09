@@ -44,7 +44,7 @@ class DETR(nn.Module):
         self.action_class_embed = nn.Linear(self.hidden_dim, num_action_classes)
         self.activity_class_embed = nn.Linear(self.hidden_dim, num_activity_classes + 1)  # including empty groups
         self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
-        # self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
+        self.aw_embed = MLP(num_queries, self.hidden_dim, num_queries, 2)
         self.dropout = nn.Dropout(p=0.1)  # set zeros randomly, no influences on valid mask
         self.backbone = backbone
         self.aux_loss = aux_loss
@@ -71,7 +71,7 @@ class DETR(nn.Module):
         # print(mask_b)
         valid_areas_b = crop_to_original(mask_b)  # batch size, 4 (ymin ymax xmin xmax)
         boxes_features, boxes_features_ini, pos, mask = self.backbone(src_f, src_b, valid_areas_b, meta)  # roi align + position encoding  mask: B, n_max
-        hs, memory, attention_weights, attention_logits = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
+        hs, memory, attention_weights = self.transformer(boxes_features, mask, self.query_embed.weight, pos)  # hs: num_dec_layers, B*T, num_queries, hidden_dim; memory: B*T, n_max, hidden_dim; AW: B*T, num_queries, n_max
 
         # individual action classification
         B = src_f.shape[0]
@@ -92,10 +92,9 @@ class DETR(nn.Module):
 
         # for grouping based on attention weights
         attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
-        attention_logits = attention_logits.transpose(1, 2).contiguous()  # B, n_max, num_queries
-        # attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
+        attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
 
-        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_weights': attention_weights, 'attention_logits': attention_logits}  # activity scores: only take the output of the last later here
+        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_logits': attention_weights}  # activity scores: only take the output of the last later here
 
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
@@ -107,7 +106,7 @@ class DETR(nn.Module):
         # this is a workaround to make torchscript happy, as torchscript
         # doesn't support dictionary with non-homogeneous values, such
         # as a dict having both a Tensor and a list.
-        return [{'pred_action_logits': action_scores, 'pred_activity_logits': a, 'attention_weights': attention_weights} for a in activity_scores[:-1]]
+        return [{'pred_action_logits': action_scores, 'pred_activity_logits': a, 'attention_logits': attention_weights} for a in activity_scores[:-1]]
 
 
 class SetCriterion(nn.Module):
@@ -530,7 +529,7 @@ def build(args):
     else:
         raise ValueError(f'import format {args.input_format} not supported, options: image or feature')
 
-    transformer = build_transformer_Q(args)
+    transformer = build_transformer(args)
 
     model = DETR(
         backbone,
