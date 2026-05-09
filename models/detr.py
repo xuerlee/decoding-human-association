@@ -530,8 +530,8 @@ def build(args):
     else:
         raise ValueError(f'import format {args.input_format} not supported, options: image or feature')
 
-    # transformer = build_transformer(args)
-    transformer = build_transformer_Q(args)
+    transformer = build_transformer(args)
+    # transformer = build_transformer_Q(args)
 
     model = DETR(
         backbone,
