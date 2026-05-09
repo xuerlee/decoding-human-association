@@ -3,7 +3,7 @@ Reference:
 https://github.com/facebookresearch/detr
 """
 
-from .detr import build
+from .model_Q import build
 
 
 def build_model(args):
