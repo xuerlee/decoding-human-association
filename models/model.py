@@ -94,7 +94,7 @@ class DETR(nn.Module):
         attention_weights = attention_weights.transpose(1, 2).contiguous()  # B, n_max, num_queries
         attention_weights = self.aw_embed(attention_weights)  # B, n_max, num_queries
 
-        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_logits': attention_weights}  # activity scores: only take the output of the last later here
+        out = {'pred_action_logits': action_scores, 'pred_activity_logits': activity_scores[-1], 'attention_logits': attention_weights, 'attention_weights': attention_weights}  # activity scores: only take the output of the last later here
 
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(action_scores, activity_scores, attention_weights)
