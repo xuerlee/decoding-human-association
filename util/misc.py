@@ -548,6 +548,7 @@ def plot_confusion_matrix(y_true, y_pred, save_path, class_names=None, normalize
     ax.set_title("Normalized Confusion Matrix" if normalize else "Confusion Matrix")
     save_path = save_path + '/confusion_matrix.jpg'
     plt.savefig(save_path, bbox_inches="tight")
+    plt.close(fig)
     # plt.title("Normalized Confusion Matrix" if normalize else "Confusion Matrix")
     # plt.tight_layout()
     # plt.show()

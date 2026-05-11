@@ -17,7 +17,7 @@ os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 # os.environ['MALLOC_PERTURB_'] = '153'
 
 import matplotlib
-matplotlib.use("TkAgg")
+matplotlib.use(os.environ.get("MPLBACKEND", "Agg"))
 
 from featuremaps import build_fmset
 from dataset import build_dataset

@@ -83,3 +83,5 @@ runs_old/8 grpbcesizecost/epoch_social_acc.png
 runs_old/9 grpbcesizecost_bceloss/epoch_membership_acc.png
 runs_old/9 grpbcesizecost_bceloss/epoch_social_acc.csv
 runs_old/9 grpbcesizecost_bceloss/epoch_social_acc.png
+debug imgs/I3D feat_sid=huang-2-2019-01-25_0_image4_fid=15_frame=0_bf_idx=0.png
+debug imgs/I3D feat_sid=nvidia-aud-2019-04-18_0_image0_fid=60_frame=0_bf_idx=0.png

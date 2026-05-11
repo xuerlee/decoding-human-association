@@ -4,13 +4,16 @@ import json
 import random
 import time
 from pathlib import Path
+import os
 
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
-import os
+import matplotlib
+matplotlib.use(os.environ.get("MPLBACKEND", "Agg"))
+
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 import featuremaps
@@ -21,9 +24,6 @@ import util.misc as utils
 from engine import evaluate, train_one_epoch
 from visualization import visualization
 from models import build_model
-
-import matplotlib
-matplotlib.use("TkAgg")
 
 
 
