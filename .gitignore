@@ -25,3 +25,7 @@ runs/
 
 # IDE files
 .idea/
+debug imgs/I3D feat_sid=clark-center-2019-02-28_1_image4_fid=45_frame=0_bf_idx=0.png
+debug imgs/I3D feat_sid=tressider-2019-04-26_2_image2_fid=45_frame=0_bf_idx=0.png
+debug imgs/I3D feat_sid=tressider-2019-04-26_2_image8_fid=45_frame=0_bf_idx=0.png
+.codex

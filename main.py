@@ -1,6 +1,5 @@
 import argparse
 import datetime
-import json
 import random
 import time
 from pathlib import Path
@@ -17,13 +16,15 @@ os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 # os.environ['MALLOC_CHECK_'] = '3'
 # os.environ['MALLOC_PERTURB_'] = '153'
 
+import matplotlib
+matplotlib.use("TkAgg")
+
 from featuremaps import build_fmset
 from dataset import build_dataset
 
 import util.misc as utils
 from engine import evaluate, train_one_epoch, train_one_epoch_accum_steps
 from models import build_model
-
 
 
 def get_args_parser():
@@ -192,7 +193,6 @@ def main(args):
 
     # optimizer = torch.optim.SGD(param_dicts, lr=args.lr, momentum=0.9, weight_decay=0.0000001)
     # lr_scheduler= torch.optim.lr_scheduler.MultiStepLR(optimizer, args.lr_drop)
-
 
     if args.input_format == 'feature':  # only collective is available
         dataset_train, dataset_val = build_fmset(args=args)

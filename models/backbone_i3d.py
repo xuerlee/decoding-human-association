@@ -13,6 +13,7 @@ from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.ops import RoIAlign
 from typing import Dict, List
+from pathlib import Path
 from util.misc import NestedTensor, is_main_process
 
 # from .i3d_charade import i3d, i3d_noglobal
@@ -128,8 +129,17 @@ def viz_i3d_feature_and_rois(  # to verify if roi bboxes are correct
     # ax.set_title(f"I3D feat | sid={meta['sid']}, fid={int(meta['cid'])}, frame={frame_idx}, bf_idx={bf_idx}")
     ax.set_xlim([0, FW])
     ax.set_ylim([FH, 0])  # y-axis is aheading down
-    plt.tight_layout()
+    fig.tight_layout()
+
+    debug_dir = Path("debug imgs")
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(
+        debug_dir / f"I3D feat_sid={meta['sid']}_fid={int(meta['src_fid'])}_frame={frame_idx}_bf_idx={bf_idx}.png",
+        dpi=150,
+        bbox_inches="tight",
+    )
     plt.show()
+    plt.close(fig)
 
 
 class BackboneI3D(nn.Module):
