@@ -301,9 +301,10 @@ class SetCriterion(nn.Module):
         P_qn_clamped = P_qn.clamp(min=1e-6, max=1 - 1e-6)
         lognegP_qn = torch.log1p(-P_qn_clamped)
 
-        all_prob_valid = (logP_qn * target_one_hot.float() * valid_mask.float()
-                    + lognegP_qn * (1 - target_one_hot.float()) * valid_mask.float())  # [B, num_queries, n_max]
+        # all_prob_valid = (logP_qn * target_one_hot.float() * valid_mask.float()
+        #             + lognegP_qn * (1 - target_one_hot.float()) * valid_mask.float())  # [B, num_queries, n_max]
 
+        all_prob_valid = (logP_qn * target_one_hot.float() * valid_mask.float())  # [B, num_queries, n_max]
         group_loss = -all_prob_valid.sum(dim=-1) / (valid_mask.float().sum(dim=-1) + 1e-6)  # [B, num_queries]
 
         # valid_mask: [B, num_queries, n_max]
