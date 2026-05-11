@@ -867,6 +867,14 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
     elif dataset == 'cafe':
         _, activity_names = _names_for_dataset(dataset)
         categories = [{"id": i, "name": n} for i, n in enumerate(activity_names)]
+        
+        membership_acc = 100 * (correct_memberships / overall_persons)
+        social_acc = 100 * (correct_persons / overall_persons)
+        grouping_acc = 100 * (correct_groups / overall_groups)
+        print('membership accuracy: ', membership_acc)
+        print('social accuracy: ', social_acc)
+        print('grouping accuracy: ', grouping_acc)
+        
         mAP10, APs10 = group_mAP_eval(gt_groups_ids_all, gt_groups_activity_all,
                                       pred_groups_ids_all, pred_groups_activity_all, pred_groups_scores_all,
                                       categories, thresh=1.0)
@@ -889,6 +897,9 @@ def evaluate(args, dataset, model, criterion, data_loader, device, save_path, if
         print("group_P@0.5:", p)
         print("group_R@0.5:", r)
         print("group_F1@0.5:", f1)
+
+        stats.update({'membership_acc': _to_python_float(membership_acc),
+                    'social_acc': _to_python_float(social_acc)})
 
     if if_confuse:
         # confusion matrix (labels depend on dataset)
