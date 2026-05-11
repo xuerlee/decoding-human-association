@@ -116,24 +116,25 @@ class HungarianMatcher(nn.Module):
                     reduction="none"
                 )
 
-            pred_gid = out_attw_b_ini.argmax(dim=-1)  # [num_persons]
-            pred_group = torch.zeros_like(out_attw_b_ini)  # [num_persons, num_queries]
-            pred_group[torch.arange(n_person, device=out_attw_b_ini.device), pred_gid] = 1
+            # for iou cost:
+            # pred_gid = out_attw_b_ini.argmax(dim=-1)  # [num_persons]
+            # pred_group = torch.zeros_like(out_attw_b_ini)  # [num_persons, num_queries]
+            # pred_group[torch.arange(n_person, device=out_attw_b_ini.device), pred_gid] = 1
 
-            pred_group_t = pred_group.T  # [num_queries, num_persons]
-            tgt_group_t = tgt_one_hot_b_ini.T  # [num_groups, num_persons]
+            # pred_group_t = pred_group.T  # [num_queries, num_persons]
+            # tgt_group_t = tgt_one_hot_b_ini.T  # [num_groups, num_persons]
 
-            cost_iou = torch.zeros(num_queries, n_group, device=out_attw.device)
-            for i, pred_q in enumerate(pred_group_t):
-                pred_q_bool = pred_q.bool()
-                for j, tgt_g in enumerate(tgt_group_t):
-                    tgt_g_bool = tgt_g.bool()
+            # cost_iou = torch.zeros(num_queries, n_group, device=out_attw.device)
+            # for i, pred_q in enumerate(pred_group_t):
+            #     pred_q_bool = pred_q.bool()
+            #     for j, tgt_g in enumerate(tgt_group_t):
+            #         tgt_g_bool = tgt_g.bool()
 
-                    inter = (pred_q_bool & tgt_g_bool).sum().float()
-                    union = (pred_q_bool | tgt_g_bool).sum().float()
-                    iou = inter / (union + 1e-6)
+            #         inter = (pred_q_bool & tgt_g_bool).sum().float()
+            #         union = (pred_q_bool | tgt_g_bool).sum().float()
+            #         iou = inter / (union + 1e-6)
 
-                    cost_iou[i, j] = 1.0 - iou
+            #         cost_iou[i, j] = 1.0 - iou
 
             # for i, out_attw_b_query in enumerate(out_attw_b):  # n_persons (can be regarded as cls) for certain query: multi cls classification for group
             #     for j, tgt_one_hot_b_group in enumerate(tgt_one_hot_b):  # n_persons (can be regarded as cls) for certain group
@@ -143,9 +144,10 @@ class HungarianMatcher(nn.Module):
             #         # activity_cost[i][j] = F.cross_entropy(out_activity_prob_b[i].float(), tgt_activity_ids_b[j])
             #         # activity_cost[i][j] = -out_activity_prob_b[i].float() * tgt_activity_ids_b[j] - (1 - out_activity_prob_b[i].float()) * (1 - tgt_activity_ids_b[j])  # direction: -> smaller cost  0.
             #         activity_cost[i][j] = F.binary_cross_entropy_with_logits(out_activity_prob_b[i].float(), tgt_activity_ids_b_oh[j].float())
+            
+            # cost_b = cost_iou
 
-            # cost_b = self.cost_group * grouping_cost + self.cost_activity_class * activity_cost + self.cost_size * size_cost
-            cost_b = cost_iou
+            cost_b = self.cost_group * grouping_cost + self.cost_activity_class * activity_cost + self.cost_size * size_cost
             cost_b = cost_b.cpu().numpy()
             indices_b = linear_sum_assignment(cost_b)
             indices.append(indices_b)  # indices: B, 2 (prediction_id, target_id), num_groups
