@@ -40,9 +40,9 @@ def get_args_parser():
                         help='gradient clipping max norm')
 
     # * Transformer
-    parser.add_argument('--enc_layers', default=6, type=int,
+    parser.add_argument('--enc_layers', default=2, type=int,
                         help="Number of encoding layers in the transformer")
-    parser.add_argument('--dec_layers', default=6, type=int,
+    parser.add_argument('--dec_layers', default=2, type=int,
                         help="Number of decoding layers in the transformer")
     parser.add_argument('--dim_feedforward', default=2048, type=int,
                         help="Intermediate size of the feedforward layers in the transformer blocks")
@@ -123,7 +123,7 @@ def get_args_parser():
     parser.add_argument('--roi_align', default=[7, 7], type=int,  # openpifpaf output
                         help='size of roi_align')
 
-    parser.add_argument('--output_dir', default='output_imgs/0',
+    parser.add_argument('--output_dir', default='output_imgs/new_jrdbgroup_hidden256_enc2dec2_12queries_lossratio223_grpnllcost_bceloss_optgroupingonly',
                         help='path where to save, empty for no saving')
     parser.add_argument('--runs_dir', default='runs/test',
                         help='path where to save, empty for no saving')
@@ -134,7 +134,7 @@ def get_args_parser():
                         # default='output_dir/restartall_hidden256_enc2dec2_lossratio223_1frame_kinetic400/checkpoint0250.pth',
                         # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_cafe_fullonehot_kinetics_sampleequal_CyclicLR_place/checkpoint0010.pth',
                         # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdb_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR/checkpoint0029.pth',
-                        default='output_dir/0/checkpoint0059.pth',
+                        default='output_dir/new_jrdbgroup_hidden256_enc2dec2_12queries_lossratio223_grpnllcost_bceloss_optgroupingonly/checkpoint0041.pth',
                         help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
