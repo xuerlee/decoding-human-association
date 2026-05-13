@@ -104,8 +104,7 @@ def cafe_read_annotations(ann_file):
             if y1 < 0: y1 = 0.0
             bbox = [x1, y1, x2, y2]
             if group_name != 'individual':  # group
-                group_id = int(group_name[-1])  # start from 1
-
+                group_id = int(group_name.removeprefix('group'))  # start from 1
                 if actor['attributes'][0]['value'] != "":
                     action = action_name_to_id[actor['attributes'][0]['value']['key']]
                     activity = action
@@ -123,6 +122,7 @@ def cafe_read_annotations(ann_file):
                     if any(group.get('group_id') == group_id for group in annotations['groups']):
                         group = [group for group in annotations['groups'] if group.get('group_id') == group_id][0]
                         action = group['activity']
+                        group['include_id'].append(person_id)
                     else:
                         action = -1
 
