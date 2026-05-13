@@ -136,6 +136,8 @@ def get_args_parser():
                         # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_cafe_fullonehot_kinetics_sampleequal_CyclicLR_place/checkpoint0010.pth',
                         # default='output_dir/restartall_hidden256_enc6dec6_12queries_lossratio223_jrdbgroup_kinetics_remvoccsevoccnoevalnone_ioufiltered_11act_sampleequal_CyclicLR_TransQ_noscalenorm_001entropy_grpbcesizecost_bcesizeloss_rmvNaN_optgroupingonly_lr1e-4_sizelossratio5/checkpoint0015.pth',
                         help='resume from checkpoint')
+    parser.add_argument('--2stage', default=False, action='store_true',
+                        help='whether to use the 2-stage version of the model')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', default=False, action='store_true')
