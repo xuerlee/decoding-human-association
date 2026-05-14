@@ -88,7 +88,7 @@ def get_args_parser():
                         help='choose the dataset: collective, volleyball, jrdb, cafe')
     parser.add_argument('--cafe_split',
                         default='place',
-                        help='by place or bybview for cafe split')
+                        help='by place or by view for cafe split')
     parser.add_argument('--input_format', default='image',
                         help='choose original images or extracted features in numpy format: image or feature')
     parser.add_argument('--feature_map_path',
